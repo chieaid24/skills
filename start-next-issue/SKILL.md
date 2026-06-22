@@ -1,9 +1,9 @@
 ---
-name: next-issue
-description: Self-looping worker that grabs the next ready issue from the dependency-aware GitHub queue, works it to a green-CI merge, then takes the next — until stopped. Use when the user wants an agent to autonomously work the issue queue, "work the next issue", "start working issues", run the agent loop, or invokes /next-issue.
+name: start-next-issue
+description: Self-looping worker that grabs the next ready issue from the dependency-aware GitHub queue, works it to a green-CI merge, then takes the next — until stopped. Use when the user wants an agent to autonomously work the issue queue, "work the next issue", "start working issues", run the agent loop, or invokes /start-next-issue.
 ---
 
-# Next Issue
+# Start Next Issue
 
 A self-looping worker for the dependency-aware GitHub Issues queue. Point each parallel agent (Claude Code or Codex CLI) at this; it grabs one ready issue, drives it to a merged PR, then loops to the next, running until stopped (by you, or by usage limits).
 
@@ -61,11 +61,11 @@ gh pr checks <pr> --watch
 - **Ready set empty but open issues remain** (all blocked or claimed) → **poll with backoff**: re-read every ~60s; resume when one becomes ready.
 - **No open issues remain** → the queue is drained → **exit** and say so.
 - **3-strike CI failure** → halt (step 5).
-- **Usage limits** kill the session mid-issue → it leaves a paused `in-progress` claim (out of the ready set, so siblings ignore it). Re-invoke `/next-issue` when limits reset — step 0 resumes the paused lane.
+- **Usage limits** kill the session mid-issue → it leaves a paused `in-progress` claim (out of the ready set, so siblings ignore it). Re-invoke `/start-next-issue` when limits reset — step 0 resumes the paused lane.
 
 ## Notes
 - **Crash-safe by construction:** the ready set IS the resume state — no checkpoint file. A kill leaves at most one in-progress issue, recovered by step 0.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, that's fine — it rebases at its own merge gate.
 - One issue per branch/PR — never batch.
-- This skill only **consumes** the queue. Authoring/edges are `to-issues` and `/issue`.
+- This skill only **consumes** the queue. Authoring/edges are `to-issues` and `/to-issue`.
 - `gh` ≥ 2.94.0 — older `gh` returns no `blockedBy` and the ready set is silently wrong; fail loudly.

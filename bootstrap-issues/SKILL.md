@@ -5,7 +5,7 @@ description: Bootstrap a repo for parallel autonomous agents coordinated via a d
 
 # Bootstrap Issues
 
-Bootstraps the parallel-agent + GitHub Issues workflow in the current repo so several agents (Claude Code or Codex CLI, interchangeably) can each grab an issue, work in an isolated worktree, and self-merge through a CI gate. Work is ordered by native GitHub `blocked-by` dependencies; agents consume the queue with `/next-issue` and add to it with `to-issues` / `/issue`.
+Bootstraps the parallel-agent + GitHub Issues workflow in the current repo so several agents (Claude Code or Codex CLI, interchangeably) can each grab an issue, work in an isolated worktree, and self-merge through a CI gate. Work is ordered by native GitHub `blocked-by` dependencies; agents consume the queue with `/start-next-issue` and add to it with `to-issues` / `/to-issue`.
 
 This skill makes **outward-facing changes to a GitHub repo** (creates labels, sets branch protection, enables auto-merge). Always present the plan and get explicit confirmation before applying them — see step 2.
 
@@ -14,7 +14,7 @@ This skill makes **outward-facing changes to a GitHub repo** (creates labels, se
 Check these first; stop with a clear message if any fail:
 - Inside a git repo with a GitHub `origin` (`git remote get-url origin`).
 - `gh` is authenticated (`gh auth status`).
-- **`gh` ≥ 2.94.0** — the dependency-aware queue reads `blockedBy`/`stateReason` JSON fields that older `gh` cannot return, so `/next-issue` would silently compute the wrong ready set. Check `gh --version` and tell the user to upgrade if older.
+- **`gh` ≥ 2.94.0** — the dependency-aware queue reads `blockedBy`/`stateReason` JSON fields that older `gh` cannot return, so `/start-next-issue` would silently compute the wrong ready set. Check `gh --version` and tell the user to upgrade if older.
 - Capture `<owner>/<repo>` and the default branch:
   ```bash
   gh repo view --json nameWithOwner,defaultBranchRef --jq '{repo: .nameWithOwner, branch: .defaultBranchRef.name}'
@@ -79,8 +79,8 @@ Remove every one-shot artifact created during bootstrap — the temp protection 
 
 State what changed, anything skipped (e.g. branch protection when the scope was missing + the manual steps), and how the queue runs from here:
 
-- **Fill the queue:** `to-prd` → `to-issues` (batch breakdown, authors the dependency DAG) or `/issue` (add one issue, reconciled against the open graph).
-- **Work the queue:** point each agent at `/next-issue` — it self-loops, grabbing the most-blocking ready issue, working it to a green-CI merge, then taking the next.
+- **Fill the queue:** `to-prd` → `to-issues` (batch breakdown, authors the dependency DAG) or `/to-issue` (add one issue, reconciled against the open graph).
+- **Work the queue:** point each agent at `/start-next-issue` — it self-loops, grabbing the most-blocking ready issue, working it to a green-CI merge, then taking the next.
 
 ## Notes
 
@@ -88,4 +88,4 @@ State what changed, anything skipped (e.g. branch protection when the scope was 
 - **Idempotent:** re-running skips existing labels (`--force` upserts), an existing `AGENTS.md` symlink, and `.gitignore` lines already present.
 - **GitHub-only** (uses `gh`). For repos hosted elsewhere, only the docs + templates apply.
 - Owner direct-pushes to the protected branch bypass the check (`enforce_admins=false`); agents go through PRs and hit the gate.
-- The dependency queue (`blocked-by` edges, the `ready`/`completed` rule, the claim mutex) is described in `templates/workflow-section.md` and consumed by `/next-issue`. Keep all four skills (`bootstrap-issues`, `to-issues`, `/issue`, `/next-issue`) in agreement on those conventions.
+- The dependency queue (`blocked-by` edges, the `ready`/`completed` rule, the claim mutex) is described in `templates/workflow-section.md` and consumed by `/start-next-issue`. Keep all four skills (`bootstrap-issues`, `to-issues`, `/to-issue`, `/start-next-issue`) in agreement on those conventions.

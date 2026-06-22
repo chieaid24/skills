@@ -1,9 +1,9 @@
 ---
-name: issue
-description: File one well-formed agent issue and wire its dependencies — drafts a single tracer-bullet issue, then detects bidirectional blocked-by/blocking edges against the open issue graph and creates them natively via gh. Use when the user wants to add a single issue, file a ticket, "create an issue", or invokes /issue. For breaking a whole plan into many issues, use to-issues instead.
+name: to-issue
+description: File one well-formed agent issue and wire its dependencies — drafts a single tracer-bullet issue, then detects bidirectional blocked-by/blocking edges against the open issue graph and creates them natively via gh. Use when the user wants to add a single issue, file a ticket, "create an issue", or invokes /to-issue. For breaking a whole plan into many issues, use to-issues instead.
 ---
 
-# Issue
+# To Issue
 
 Create ONE dependency-aware issue and slot it into the existing queue. For batch breakdown of a plan or PRD, use `to-issues` instead — but note `to-issues` calls **this skill's open-graph routine** (section 2) to reconcile its new batch against pre-existing open issues, so keep that routine authoritative.
 
@@ -53,7 +53,7 @@ Show the drafted issue **and** the proposed edges, both directions. The human ap
 
 ## 5. Report
 
-State the new issue number, its edges, and whether it's **immediately grabbable** (no open blockers) or **waiting** (has open blockers). If the queue now has ready work, suggest `/next-issue`.
+State the new issue number, its edges, and whether it's **immediately grabbable** (no open blockers) or **waiting** (has open blockers). If the queue now has ready work, suggest `/start-next-issue`.
 
 ## Notes
 

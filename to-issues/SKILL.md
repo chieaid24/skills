@@ -33,7 +33,7 @@ Slices may be 'HITL' or 'AFK'. HITL slices require human interaction, such as an
 
 ### 4. Reconcile against the open graph, then quiz the user
 
-First, run the **open-graph edge detection from the `/issue` skill** (section 2 there) across the batch: compare each drafted slice against the repo's existing OPEN issues (`gh issue list --state open --json number,title,body,labels`), in **both** directions — does a slice depend on pre-existing open work (`blocked-by`), or does a slice now block a pre-existing issue (`blocking`)? Model **true logical dependencies only**, never file overlap, and bias conservative when unsure.
+First, run the **open-graph edge detection from the `/to-issue` skill** (section 2 there) across the batch: compare each drafted slice against the repo's existing OPEN issues (`gh issue list --state open --json number,title,body,labels`), in **both** directions — does a slice depend on pre-existing open work (`blocked-by`), or does a slice now block a pre-existing issue (`blocking`)? Model **true logical dependencies only**, never file overlap, and bias conservative when unsure.
 
 Present the proposed breakdown as a numbered list. For each slice, show:
 
@@ -94,4 +94,4 @@ gh issue edit <slice> --add-blocked-by <blocker>    # this slice needs <blocker>
 gh issue edit <slice> --add-blocking  <dependent>   # <dependent> now needs this slice first
 ```
 
-Then point the user at `/next-issue` to start working the queue.
+Then point the user at `/start-next-issue` to start working the queue.

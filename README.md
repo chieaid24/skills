@@ -8,8 +8,8 @@ Claude Code / Codex CLI skills for running **parallel autonomous agents on a dep
 |---|---|
 | **bootstrap-issues** | One-shot repo setup: CI test gate, work-queue labels, branch protection with self-merge, issue template, and the `AGENTS.md`/`CLAUDE.md` workflow docs. |
 | **to-issues** | Break a plan/PRD into tracer-bullet vertical slices; author native `blocked-by` edges. |
-| **issue** | Add a single issue and wire its bidirectional dependencies against the open graph. |
-| **next-issue** | Self-looping worker: grab the most-blocking ready issue → work it → babysit CI → merge → repeat. |
+| **to-issue** | Add a single issue and wire its bidirectional dependencies against the open graph. |
+| **start-next-issue** | Self-looping worker: grab the most-blocking ready issue → work it → babysit CI → merge → repeat. |
 
 ## How it works
 
@@ -28,13 +28,13 @@ Claude Code / Codex CLI skills for running **parallel autonomous agents on a dep
 Symlink each skill into your skills dirs (Codex reads `~/.agents/skills/`, Claude reads `~/.claude/skills/`):
 
 ```bash
-for s in bootstrap-issues to-issues issue next-issue; do
+for s in bootstrap-issues to-issues to-issue start-next-issue; do
   ln -s "$PWD/$s" ~/.agents/skills/$s
   ln -s ../../.agents/skills/$s ~/.claude/skills/$s
 done
 ```
 
-Then run `/bootstrap-issues` in a target repo to set it up, `to-issues` / `/issue` to fill the queue, and `/next-issue` to work it.
+Then run `/bootstrap-issues` in a target repo to set it up, `to-issues` / `/to-issue` to fill the queue, and `/start-next-issue` to work it.
 
 ---
 
