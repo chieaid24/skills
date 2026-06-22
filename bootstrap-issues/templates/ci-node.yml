@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main] # set to the repo's default branch
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    # If the project lives in a subdir, uncomment and set:
+    # defaults:
+    #   run:
+    #     working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          # cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      # GitHub Actions sets CI=true so most runners exit; for vitest watch use `npm test -- --run`.
+      - run: npm test
