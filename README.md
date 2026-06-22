@@ -1,6 +1,8 @@
 # skills
 
-Claude Code / Codex CLI skills for running **parallel autonomous agents on a dependency-aware GitHub Issues queue**. One agent grabs a ready issue, works it to a green-CI merge, and self-loops to the next; work is ordered by native GitHub `blocked-by` dependencies.
+These are my personal skills for my own productivity workflow — and honestly I love how they run. I point a few autonomous agents (Claude Code / Codex CLI) at a **dependency-aware GitHub Issues queue** and let them ship: each agent grabs a ready issue, works it to a green-CI merge, and self-loops to the next, with ordering driven by native GitHub `blocked-by` dependencies.
+
+Built around how I like to work — but you're welcome to use it if it's useful to you. 🚀
 
 ## The skills
 
