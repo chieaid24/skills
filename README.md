@@ -1,8 +1,8 @@
 # skills
 
-Personal skills for a parallel-agent productivity workflow. Free to use.
+My personal skills for a parallel-agent development workflow.
 
-Claude Code and Codex CLI skills that run autonomous agents against a dependency-aware GitHub Issues queue. Each agent grabs a ready issue, works it to a green-CI merge, then self-loops to the next. Work is ordered by native GitHub `blocked-by` dependencies.
+These are Claude Code and Codex CLI skills that run autonomous agents against a dependency-aware GitHub Issues queue. Each agent grabs a ready issue, works it to a green-CI merge, then self-loops to the next. Work is ordered by native GitHub `blocked-by` dependencies.
 
 ## The skills
 
