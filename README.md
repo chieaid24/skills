@@ -8,7 +8,8 @@ These are Claude Code and Codex CLI skills that run autonomous agents against a 
 
 | Skill | What it does |
 |---|---|
-| **bootstrap-issues** | One-shot repo setup: CI test gate, work-queue labels, branch protection with self-merge, issue template, and the `AGENTS.md`/`CLAUDE.md` workflow docs. |
+| **bootstrap-issues** | One-shot repo setup: CI test gate, work-queue labels, branch protection with self-merge, issue template, pre-commit hooks (via `setup-pre-commit`), and the `AGENTS.md`/`CLAUDE.md` workflow docs. |
+| **setup-pre-commit** | Stack-aware pre-commit hook — format → lint → test before every commit (Husky for JS/TS, the `pre-commit` framework for Python, a tracked git hook for Rust/Go). Called by `bootstrap-issues`; runs standalone too. |
 | **spec** | Pipeline entry: grill a rough idea → sharpen domain language + write ADRs → publish `[PRD]` issue → suggest `/to-issues`. |
 | **to-prd** | Synthesize already-grilled context into a `[PRD]` issue. Invoked automatically by `/spec`; use directly only if grilling was done separately. |
 | **to-issues** | Break a plan/PRD into tracer-bullet vertical slices; author native `blocked-by` edges. |
@@ -32,7 +33,7 @@ These are Claude Code and Codex CLI skills that run autonomous agents against a 
 Symlink each skill into your skills dirs (Codex reads `~/.agents/skills/`, Claude reads `~/.claude/skills/`):
 
 ```bash
-for s in bootstrap-issues spec to-prd to-issues to-issue start-next-issue; do
+for s in bootstrap-issues setup-pre-commit spec to-prd to-issues to-issue start-next-issue; do
   ln -s "$PWD/$s" ~/.agents/skills/$s
   ln -s ../../.agents/skills/$s ~/.claude/skills/$s
 done

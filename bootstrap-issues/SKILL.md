@@ -39,6 +39,7 @@ Summarize exactly what will change, then ask the user to confirm before applying
 - **Files:** `.github/workflows/ci.yml` (chosen template), `.github/ISSUE_TEMPLATE/task.md`.
 - **Labels:** `ready`, `in-progress`, `review`, `blocked`.
 - **Docs:** ensure `CLAUDE.md` exists; gitignore `CLAUDE.md` + `AGENTS.md`; symlink `AGENTS.md → CLAUDE.md`; append the **Parallel agent workflow** section.
+- **Pre-commit hooks:** via the `setup-pre-commit` skill — a stack-aware hook (format → lint → test) that runs before every local commit, mirroring the CI `test` gate. Committed so every agent shares it.
 - **GitHub config:** branch protection on `<default-branch>` requiring the `test` check, **no required reviews** (so an agent merges its own PR); enable auto-merge + delete-branch-on-merge.
 
 ## 3. Apply (after confirmation)
@@ -49,7 +50,9 @@ Summarize exactly what will change, then ask the user to confirm before applying
 
 2. **Docs pattern.** If `CLAUDE.md` is missing, create a minimal one (title + one-line overview). Add `CLAUDE.md` and `AGENTS.md` to `.gitignore` (under a `# Claude Code` / `# Codex` heading; skip lines already present). Symlink: `ln -s CLAUDE.md AGENTS.md` (skip if it exists). Append `templates/workflow-section.md` to `CLAUDE.md`, replacing every `<default-branch>` with the real branch name.
 
-3. **Labels — inline, never a committed script:**
+3. **Pre-commit hooks.** Invoke the **`setup-pre-commit`** skill for the same stack detected in step 1. It installs a format → lint → test pre-commit hook (Husky for JS/TS, the `pre-commit` framework for Python, a tracked `.githooks/` script for Rust/Go), verifies it, **commits its own files**, and records the per-clone activation command in the docs (Husky needs none; Python `pre-commit install`; Rust/Go `git config core.hooksPath .githooks`). Keep the hook's test command consistent with the CI workflow's so the local gate mirrors the `test` check. If the repo has no test/lint tooling, the skill omits those steps and says so.
+
+4. **Labels — inline, never a committed script:**
    ```bash
    gh label create ready       --color 0E8A16 --description "Refined AFK work; grabbable once its blockers are completed" --force
    gh label create in-progress --color FBCA04 --description "Claimed (assignee) and being worked"                         --force
@@ -58,9 +61,9 @@ Summarize exactly what will change, then ask the user to confirm before applying
    gh label create prd         --color 5319E7 --description "Product requirements document; parent of work slice issues"  --force
    ```
 
-4. **Commit + land the workflow.** Stage only the shareable files (`.github/`), commit (`chore: add agentic-issues CI + issue template`), and push so `ci.yml` reaches `<default-branch>` (direct push as owner, or open + merge a bootstrap PR — the PR carries the workflow so its own `test` check can run). `CLAUDE.md`/`AGENTS.md` are gitignored and stay local.
+5. **Commit + land the workflow.** Stage only the shareable files (`.github/`), commit (`chore: add agentic-issues CI + issue template`), and push so `ci.yml` reaches `<default-branch>` (direct push as owner, or open + merge a bootstrap PR — the PR carries the workflow so its own `test` check can run). The pre-commit hook files (step 3) were already committed by that skill; `CLAUDE.md`/`AGENTS.md` are gitignored and stay local.
 
-5. **Branch protection + auto-merge.** Probe the Administration scope by enabling auto-merge:
+6. **Branch protection + auto-merge.** Probe the Administration scope by enabling auto-merge:
    ```bash
    gh api -X PATCH repos/<owner>/<repo> -F allow_auto_merge=true -F delete_branch_on_merge=true -F allow_squash_merge=true
    ```
@@ -78,7 +81,7 @@ Remove every one-shot artifact created during bootstrap — the temp protection 
 
 ## 5. Report
 
-State what changed, anything skipped (e.g. branch protection when the scope was missing + the manual steps), and how the queue runs from here:
+State what changed, anything skipped (e.g. branch protection when the scope was missing + the manual steps), the pre-commit hook installed and its per-clone activation command (if any), and how the queue runs from here:
 
 - **Fill the queue:** `/spec` (grill idea → update docs → publish PRD → suggest `/to-issues`) or `/to-issue` (add one issue, reconciled against the open graph).
 - **Work the queue:** point each agent at `/start-next-issue` — it self-loops, grabbing the most-blocking ready issue, working it to a green-CI merge, then taking the next.
@@ -86,7 +89,7 @@ State what changed, anything skipped (e.g. branch protection when the scope was 
 ## Notes
 
 - The job name `test` is the required-check context across every stack — keep it `test`.
-- **Idempotent:** re-running skips existing labels (`--force` upserts), an existing `AGENTS.md` symlink, and `.gitignore` lines already present.
+- **Idempotent:** re-running skips existing labels (`--force` upserts), an existing `AGENTS.md` symlink, `.gitignore` lines already present, and (via `setup-pre-commit`) any pre-commit config files that already exist.
 - **GitHub-only** (uses `gh`). For repos hosted elsewhere, only the docs + templates apply.
 - Owner direct-pushes to the protected branch bypass the check (`enforce_admins=false`); agents go through PRs and hit the gate.
 - The dependency queue (`blocked-by` edges, the `ready`/`completed` rule, the claim mutex) is described in `templates/workflow-section.md` and consumed by `/start-next-issue`. Keep all four skills (`bootstrap-issues`, `to-issues`, `/to-issue`, `/start-next-issue`) in agreement on those conventions.
