@@ -15,6 +15,7 @@ These are Claude Code and Codex CLI skills that run autonomous agents against a 
 | **to-issues** | Break a plan/PRD into tracer-bullet vertical slices; author native `blocked-by` edges. |
 | **to-issue** | Add a single issue and wire its bidirectional dependencies against the open graph. |
 | **start-next-issue** | Self-looping worker: grab the most-blocking ready issue → work it → babysit CI → merge → repeat. |
+| **catch-up** | Daily read-only reviewer: reconstruct what shipped / is in progress / is blocked since the last run, diagnose stalled lanes from their worktrees, log to `progress/progress.md`, print a summary with per-lane dev commands. |
 
 ## How it works
 
@@ -33,13 +34,13 @@ These are Claude Code and Codex CLI skills that run autonomous agents against a 
 Symlink each skill into your skills dirs (Codex reads `~/.agents/skills/`, Claude reads `~/.claude/skills/`):
 
 ```bash
-for s in bootstrap-issues setup-pre-commit spec to-prd to-issues to-issue start-next-issue; do
+for s in bootstrap-issues setup-pre-commit spec to-prd to-issues to-issue start-next-issue catch-up; do
   ln -s "$PWD/$s" ~/.agents/skills/$s
   ln -s ../../.agents/skills/$s ~/.claude/skills/$s
 done
 ```
 
-Then run `/bootstrap-issues` in a target repo to set it up, `/spec` to shape an idea into a PRD + issue slices, and `/start-next-issue` to work the queue.
+Then run `/bootstrap-issues` in a target repo to set it up, `/spec` to shape an idea into a PRD + issue slices, `/start-next-issue` to work the queue, and `/catch-up` (on a daily cron) to review what the agents got done.
 
 ---
 
