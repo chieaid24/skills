@@ -80,7 +80,7 @@ Remove every one-shot artifact created during bootstrap — the temp protection 
 
 State what changed, anything skipped (e.g. branch protection when the scope was missing + the manual steps), and how the queue runs from here:
 
-- **Fill the queue:** `to-prd` → `to-issues` (batch breakdown, authors the dependency DAG) or `/to-issue` (add one issue, reconciled against the open graph).
+- **Fill the queue:** `/spec` (grill idea → update docs → publish PRD → suggest `/to-issues`) or `/to-issue` (add one issue, reconciled against the open graph).
 - **Work the queue:** point each agent at `/start-next-issue` — it self-loops, grabbing the most-blocking ready issue, working it to a green-CI merge, then taking the next.
 
 ## Notes

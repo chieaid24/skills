@@ -1,9 +1,11 @@
 ---
 name: to-prd
-description: Synthesize the current conversation context (typically after /grill-me) into a PRD and publish it to the project issue tracker as a [PRD] issue. Use when user wants to create a PRD from the current context.
+description: Synthesize the current conversation context (typically after /spec Phase 1 or /grill-with-docs) into a PRD and publish it to the project issue tracker as a [PRD] issue. Use when user wants to create a PRD from the current context. Note: /spec runs this automatically after grilling — invoke /to-prd directly only if grilling was done separately.
 ---
 
-This skill synthesizes what has already been established in conversation — typically after `/grill-me` has fleshed out the idea — into a structured PRD. Do NOT re-interview the user. Publish in one shot.
+This skill synthesizes what has already been established in conversation — typically after `/spec` Phase 1 (or a standalone `/grill-with-docs` session) has fleshed out the idea — into a structured PRD. Do NOT re-interview the user. Publish in one shot.
+
+Before writing, read the current `CONTEXT.md` and any ADRs in `docs/adr/` — use canonical terms throughout and surface relevant ADRs under Implementation Decisions.
 
 ## Process
 
