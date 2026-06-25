@@ -7,13 +7,13 @@ description: Break a plan, spec, or PRD into independently-grabbable issues on t
 
 Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
 
-The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
-
 ## Process
 
 ### 1. Gather context
 
 Work from whatever is already in the conversation context. If the user passes an issue reference (issue number, URL, or path) as an argument, fetch it from the issue tracker and read its full body and comments.
+
+If the argument issue has the `prd` label, treat it as the parent PRD: record its number and auto-populate `## Parent` in every child issue body (see template below).
 
 ### 2. Explore the codebase (optional)
 

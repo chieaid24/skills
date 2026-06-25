@@ -55,6 +55,7 @@ Summarize exactly what will change, then ask the user to confirm before applying
    gh label create in-progress --color FBCA04 --description "Claimed (assignee) and being worked"                         --force
    gh label create review      --color 1D76DB --description "PR open, awaiting review/merge"                              --force
    gh label create blocked     --color B60205 --description "Escalated to a human (abandoned blocker, or CI failed 3x)"   --force
+   gh label create prd         --color 5319E7 --description "Product requirements document; parent of work slice issues"  --force
    ```
 
 4. **Commit + land the workflow.** Stage only the shareable files (`.github/`), commit (`chore: add agentic-issues CI + issue template`), and push so `ci.yml` reaches `<default-branch>` (direct push as owner, or open + merge a bootstrap PR — the PR carries the workflow so its own `test` check can run). `CLAUDE.md`/`AGENTS.md` are gitignored and stay local.
