@@ -1,62 +1,149 @@
 ---
 name: to-issue
-description: File one well-formed agent issue and wire its dependencies — drafts a single tracer-bullet issue, then detects bidirectional blocked-by/blocking edges against the open issue graph and creates them natively via gh. Use when the user wants to add a single issue, file a ticket, "create an issue", or invokes /to-issue. For breaking a whole plan into many issues, use to-issues instead.
+description: Create one or more dependency-aware issues from a task description or plan. Auto-detects single vs batch from context. Always reconciles against the open graph (blocked-by and blocking edges in both directions), runs a quiz loop before publishing, and labels each issue HITL or AFK. Use for "add an issue", "create a ticket", "break this plan into issues", or /to-issue. For a single issue this is a lighter loop; for a plan or PRD it breaks into tracer-bullet vertical slices.
 ---
 
 # To Issue
 
-Create ONE dependency-aware issue and slot it into the existing queue. For batch breakdown of a plan or PRD, use `to-issues` instead — but note `to-issues` calls **this skill's open-graph routine** (section 2) to reconcile its new batch against pre-existing open issues, so keep that routine authoritative.
+Create dependency-aware issues — one or many — and slot them into the existing queue. Always reconciles against the open graph; always quizzes before publishing.
+
+## 0. Detect mode
+
+Scan the conversation context:
+
+- **Batch** — a plan, spec, or PRD is present (or an issue reference with the `prd` label is passed as an argument). Break into tracer-bullet vertical slices.
+- **Single** — a specific task description is present with no decomposition needed. Create one issue.
+
+If ambiguous, ask.
 
 ## Preconditions
 
-- A git repo with a GitHub `origin`; `gh` authenticated; **`gh` ≥ 2.94.0** (needs the `--add-blocked-by` / `--add-blocking` flags and `blockedBy` JSON).
-- Capture `<owner>/<repo>` (`gh repo view --json nameWithOwner`).
+- Git repo with GitHub `origin`; `gh` authenticated; **`gh` >= 2.94.0** (needs `--add-blocked-by` / `--add-blocking` and `blockedBy` JSON fields).
+- Capture `<owner>/<repo>` via `gh repo view --json nameWithOwner`.
+- If an issue reference is passed as an argument, fetch its full body and comments.
 
-## 1. Draft the issue
+## 1. Explore (optional)
 
-- One **tracer-bullet vertical slice** — a narrow but complete path through all layers, independently mergeable. Use the project's domain glossary and respect ADRs.
-- Fill the repo's issue template (`.github/ISSUE_TEMPLATE/task.md`): Goal, Acceptance criteria, Files likely touched, Dependencies, Definition of done.
-- It will be labelled `ready` (refined AFK work) **even if it has blockers** — the ready *query* gates on edges + `completed` state, not the label, so no bot is needed to flip it later.
+If the codebase is unfamiliar, explore it. Issue titles and descriptions must use the project's domain glossary and respect any ADRs.
 
-## 2. Open-graph edge detection — the shared routine (`to-issues` calls this too)
+## 2. Draft the issue(s)
 
-Determine the candidate issue's **true logical dependencies** against the current open set, in **both** directions:
+### Single mode
 
-1. Fetch the open graph:
-   ```bash
-   gh issue list --state open --json number,title,body,labels --limit 100
-   ```
-2. Decide edges for the candidate:
-   - **blocked-by (upward)** — open issues that must be `completed` first because this issue needs their code/output to exist.
-   - **blocking (downward)** — open issues that now logically need *this* issue first (e.g. it extracts a shared helper or introduces a type they assume). **Always evaluate this direction** — a new foundational issue often blocks existing ones, and a missing downward edge is the silent, dangerous failure.
-3. **Logical dependencies only.** Ignore mere file overlap — that is *contention*, handled at the merge gate by rebase, and must never become an edge.
-4. **Conservative bias.** When genuinely unsure a real dependency exists, propose the edge. A false edge costs a little parallelism (recoverable); a missing edge sends an agent to build on code that isn't there (expensive).
+Draft one **tracer-bullet vertical slice** — narrow but complete end-to-end, independently mergeable.
 
-Output: a proposed edge list, e.g. `blocked-by: #12, #14` and `blocking: #9`.
+### Batch mode
 
-## 3. Confirm (the one human checkpoint)
+Break the plan into tracer-bullet slices. Each slice must:
+- Cut through ALL integration layers end-to-end (schema, API, UI, tests)
+- Be demoable or verifiable on its own
+- Prefer many thin slices over few thick ones
 
-Show the drafted issue **and** the proposed edges, both directions. The human approves once. After creation, agents consume the issue with no further human beat.
+For large decompositions, consider a **parent issue** that scopes the overall work with child issues as individual slices (each child references it in `## Parent`). Small standalone tasks need no parent. If the source is a PRD issue (labelled `prd`), record its number as the parent for every child.
 
-## 4. Create + wire
+### Label each draft HITL or AFK
 
-1. Write the body to a temp file in `$TMPDIR` and create the issue:
-   ```bash
-   gh issue create --title "<title>" --body-file "$TMPDIR/issue-body.md" --label ready
-   ```
-2. Author the native edges from the new issue number `<n>`:
-   ```bash
-   gh issue edit <n> --add-blocked-by <A> [--add-blocked-by <B> ...]   # this needs A, B
-   gh issue edit <n> --add-blocking  <C> [--add-blocking  <D> ...]      # C, D now need this
-   ```
-3. Delete the temp body file.
+- **AFK** — fully autonomous: implement, test, and merge without human involvement. Prefer AFK.
+- **HITL** — requires human interaction: architectural decision, design review, or external dependency.
 
-## 5. Report
+### Issue body template (every issue, single or batch)
 
-State the new issue number, its edges, and whether it's **immediately grabbable** (no open blockers) or **waiting** (has open blockers). If the queue now has ready work, suggest `/start-next-issue`.
+```markdown
+## Parent
+
+A reference to the parent PRD or tracking issue on the issue tracker. Omit if standalone.
+
+## What to build
+
+Concise end-to-end description of this slice. Describe behavior, not layer-by-layer implementation.
+Avoid specific file paths — they go stale fast. Exception: if a prototype produced a snippet that
+encodes a decision more precisely than prose (state machine, schema, type shape), inline it and
+note it came from a prototype.
+
+## Type
+
+AFK / HITL
+
+## Acceptance criteria
+
+- [ ] Criterion 1
+
+## Blocked by
+
+- #<issue> description (or "None — can start immediately")
+
+## Definition of done
+
+- [ ] CI `test` check green
+- [ ] Verified locally if runtime behavior or UI changes
+- [ ] PR on branch `<issue#>-<slug>` with `Closes #<this issue>`
+
+## Notes / context
+
+Links to specs, ADRs, related issues.
+```
+
+## 3. Open-graph edge detection
+
+Fetch the open issue graph:
+
+```bash
+gh issue list --state open --json number,title,body,labels --limit 100
+```
+
+For each drafted issue, determine edges in **both** directions:
+
+- **blocked-by (upward)** — open issues whose code/output must exist first.
+- **blocking (downward)** — open issues that now logically need *this* issue first (e.g. it extracts a shared helper or introduces a type they assume). **Always evaluate this direction** — a missing downward edge is the silent, dangerous failure.
+
+**Logical dependencies only.** File overlap is contention, handled at merge via rebase; never model it as an edge.
+
+**Conservative bias.** When genuinely unsure a real dependency exists, propose the edge. A false edge costs a little parallelism (recoverable); a missing edge sends an agent to build on code that isn't there (expensive).
+
+For batch mode: also model edges *between* the new slices themselves.
+
+## 4. Quiz the user
+
+Present the proposed issue(s). For each issue, show:
+
+- **Title**
+- **Type**: AFK / HITL
+- **Blocked by**: other slices or pre-existing open issues that must complete first
+- **Blocking**: pre-existing open issues that now depend on this issue (if any)
+- **User stories covered** (batch mode only, when source material has them)
+
+Ask:
+- Do the issue(s) feel right? (for batch: granularity — too coarse / too fine?)
+- Are the dependency relationships correct?
+- (Batch) Should any slices be merged or split further?
+- Are HITL / AFK labels correct?
+
+Iterate until the user approves.
+
+## 5. Publish
+
+Publish in **dependency order** (blockers first) so real issue numbers exist when wiring edges.
+
+For each issue:
+
+```bash
+# Write body to a temp file, create the issue, wire edges, then clean up
+gh issue create --title "<title>" --body-file "$TMPDIR/issue-body.md" --label ready
+gh issue edit <n> --add-blocked-by <A> [--add-blocked-by <B> ...]   # n needs A, B
+gh issue edit <n> --add-blocking  <C> [--add-blocking  <D> ...]      # C, D now need n
+rm -f "$TMPDIR/issue-body.md"
+```
+
+Label every issue `ready` — including those with open blockers. Actual grabbability is computed from dependency edges + `completed` state, not the label.
+
+Do NOT close or modify any parent or PRD issue.
+
+## 6. Report
+
+State each new issue number, its edges, and whether it is **immediately grabbable** (no open blockers) or **waiting** (has open blockers). If the queue now has ready work, suggest `/start-next-issue`.
 
 ## Notes
 
-- **`gh` ≥ 2.94.0** required for the dependency flags — fail loudly on older versions.
-- Never model file contention as an edge.
-- Creating the same idea twice makes a duplicate issue — scan the open set first if unsure.
+- **`gh` >= 2.94.0** required for dependency flags — fail loudly on older versions.
+- Never model file contention as a dependency edge.
+- Scan the open issue set for duplicates before creating.

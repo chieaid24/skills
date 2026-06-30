@@ -5,7 +5,7 @@ description: Bootstrap a repo for parallel autonomous agents coordinated via a d
 
 # Bootstrap Issues
 
-Bootstraps the parallel-agent + GitHub Issues workflow in the current repo so several agents (Claude Code or Codex CLI, interchangeably) can each grab an issue, work in an isolated worktree, and self-merge through a CI gate. Work is ordered by native GitHub `blocked-by` dependencies; agents consume the queue with `/start-next-issue` and add to it with `to-issues` / `/to-issue`.
+Bootstraps the parallel-agent + GitHub Issues workflow in the current repo so several agents (Claude Code or Codex CLI, interchangeably) can each grab an issue, work in an isolated worktree, and self-merge through a CI gate. Work is ordered by native GitHub `blocked-by` dependencies; agents consume the queue with `/start-next-issue` and add to it with `/to-issue`.
 
 This skill makes **outward-facing changes to a GitHub repo** (creates labels, sets branch protection, enables auto-merge). Always present the plan and get explicit confirmation before applying them — see step 2.
 
@@ -83,7 +83,7 @@ Remove every one-shot artifact created during bootstrap — the temp protection 
 
 State what changed, anything skipped (e.g. branch protection when the scope was missing + the manual steps), the pre-commit hook installed and its per-clone activation command (if any), and how the queue runs from here:
 
-- **Fill the queue:** `/spec` (grill idea → update docs → publish PRD → suggest `/to-issues`) or `/to-issue` (add one issue, reconciled against the open graph).
+- **Fill the queue:** `/spec` (grill idea → update docs → publish PRD → suggest `/to-issue`) or `/to-issue` (add one or many issues, reconciled against the open graph).
 - **Work the queue:** point each agent at `/start-next-issue` — it self-loops, grabbing the most-blocking ready issue, working it to a green-CI merge, then taking the next.
 
 ## Notes
@@ -92,4 +92,4 @@ State what changed, anything skipped (e.g. branch protection when the scope was 
 - **Idempotent:** re-running skips existing labels (`--force` upserts), an existing `AGENTS.md` symlink, `.gitignore` lines already present, and (via `setup-pre-commit`) any pre-commit config files that already exist.
 - **GitHub-only** (uses `gh`). For repos hosted elsewhere, only the docs + templates apply.
 - Owner direct-pushes to the protected branch bypass the check (`enforce_admins=false`); agents go through PRs and hit the gate.
-- The dependency queue (`blocked-by` edges, the `ready`/`completed` rule, the claim mutex) is described in `templates/workflow-section.md` and consumed by `/start-next-issue`. Keep all four skills (`bootstrap-issues`, `to-issues`, `/to-issue`, `/start-next-issue`) in agreement on those conventions.
+- The dependency queue (`blocked-by` edges, the `ready`/`completed` rule, the claim mutex) is described in `templates/workflow-section.md` and consumed by `/start-next-issue`. Keep all three skills (`bootstrap-issues`, `/to-issue`, `/start-next-issue`) in agreement on those conventions.
