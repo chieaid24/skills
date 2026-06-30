@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Full pipeline entry point for a new feature: interrogate the idea (sharpening domain language, writing ADRs as decisions crystallize), then synthesize into a [PRD] issue and suggest /to-issues to slice it into actionable work. Use when starting from a rough idea toward a dependency-linked issue queue.
+description: "Full pipeline entry point for a new feature: interrogate the idea (sharpening domain language, writing ADRs as decisions crystallize), then synthesize into a [PRD] issue and suggest /to-issues to slice it into actionable work. Use when starting from a rough idea toward a dependency-linked issue queue."
 ---
 
 # Spec
