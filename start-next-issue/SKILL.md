@@ -67,5 +67,5 @@ gh pr checks <pr> --watch
 - **Crash-safe by construction:** the ready set IS the resume state — no checkpoint file. A kill leaves at most one in-progress issue, recovered by step 0.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, that's fine — it rebases at its own merge gate.
 - One issue per branch/PR — never batch.
-- This skill only **consumes** the queue. Authoring/edges are `to-issues` and `/to-issue`.
+- This skill only **consumes** the queue. Authoring/edges are `/to-issue`.
 - `gh` ≥ 2.94.0 — older `gh` returns no `blockedBy` and the ready set is silently wrong; fail loudly.
