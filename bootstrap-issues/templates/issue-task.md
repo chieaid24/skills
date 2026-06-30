@@ -5,34 +5,37 @@ title: ""
 labels: ready
 ---
 
-## Goal
+## Parent
 
-<!-- One sentence: what this slice delivers, end-to-end. Use the project's domain glossary. -->
+<!-- Reference to the parent PRD or tracking issue (omit if standalone). -->
+
+## What to build
+
+<!-- Concise end-to-end description of this slice. Describe behavior, not layer-by-layer implementation.
+     Avoid specific file paths — they go stale fast. Exception: if a prototype produced a snippet that
+     encodes a decision more precisely than prose (state machine, schema, type shape), inline it and
+     note it came from a prototype. -->
+
+## Type
+
+<!-- AFK — fully autonomous: implement, test, and merge without human involvement (preferred)
+     HITL — requires human interaction: architectural decision, design review, or external dependency -->
 
 ## Acceptance criteria
 
 - [ ]
 
-## Files likely touched
+## Blocked by
 
-<!-- Context for refinement. Overlap with a sibling issue is fine — the second PR to land
-     rebases and re-runs CI; it is NOT a dependency. Only list a real blocker below. -->
-
--
-
-## Dependencies
-
-<!-- True logical blockers only ("needs A's code to exist"), set as native GitHub
-     `blocked-by` edges — those are authoritative. List them here for humans, e.g. "blocked by #12".
-     "None" if it can start immediately. -->
-
--
+<!-- True logical blockers only ("needs A's code to exist"), set as native GitHub `blocked-by`
+     edges — those are authoritative. List here for humans, e.g. "blocked by #12".
+     "None — can start immediately" if no blockers. -->
 
 ## Definition of done
 
 - [ ] CI `test` check green
-- [ ] Verified locally if it changes runtime behavior or UI
-- [ ] PR opened on branch `<issue#>-<slug>` with `Closes #<this issue>`
+- [ ] Verified locally if runtime behavior or UI changes
+- [ ] PR on branch `<issue#>-<slug>` with `Closes #<this issue>`
 
 ## Notes / context
 

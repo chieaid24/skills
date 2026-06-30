@@ -1,11 +1,11 @@
 ---
 name: spec
-description: "Full pipeline entry point for a new feature: interrogate the idea (sharpening domain language, writing ADRs as decisions crystallize), then synthesize into a [PRD] issue and suggest /to-issues to slice it into actionable work. Use when starting from a rough idea toward a dependency-linked issue queue."
+description: Full pipeline entry point for a new feature: interrogate the idea (sharpening domain language, writing ADRs as decisions crystallize), then synthesize into a [PRD] issue and suggest /to-issue to slice it into actionable work. Use when starting from a rough idea toward a dependency-linked issue queue.
 ---
 
 # Spec
 
-Pipeline: rough idea → grill → docs updated → PRD published → `/to-issues` suggested.
+Pipeline: rough idea → grill → docs updated → PRD published → `/to-issue` suggested.
 
 Runs two sequential phases. Do not skip to Phase 2 until Phase 1 is complete.
 
@@ -65,7 +65,7 @@ When grilling is complete and the user is satisfied with the decisions, transiti
    Delete the temp file after creation.
 
 4. Report the issue number and suggest next step:
-   > PRD published as #<n>. Run `/to-issues <n>` to break it into dependency-linked work slices.
+   > PRD published as #<n>. Run `/to-issue <n>` to break it into dependency-linked work slices.
 
 ### PRD template
 
