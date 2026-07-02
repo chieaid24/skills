@@ -106,3 +106,7 @@ source files.
 Agent Skills are executable instructions. Review a skill before installing it, use the minimum
 GitHub token permissions it needs, and test outward-facing workflows in a disposable repository
 before using them on important projects.
+
+## License
+
+[MIT](LICENSE)
