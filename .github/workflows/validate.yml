@@ -1,0 +1,26 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate skill metadata and structure
+        run: node scripts/validate-skills.mjs
+      - name: Verify Skills CLI discovery
+        shell: bash
+        run: |
+          npx -y skills add . --list | tee /tmp/discovered-skills.txt
+          for skill in skills/*; do
+            grep -Fq "$(basename "$skill")" /tmp/discovered-skills.txt
+          done
