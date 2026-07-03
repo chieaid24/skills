@@ -1,13 +1,13 @@
 ---
 name: catch-up
-description: "Daily reviewer for the dependency-aware GitHub Issues queue. Fast-forwards the clean primary repository, reconstructs the actual product changes shipped in each merged PR, reports active and blocked work, inspects stalled lanes, starts the primary repository's dev server on an available port, and explains where to look at relevant frontend and backend changes without running feature tests. Use on a daily cron or on demand: catch me up, what happened yesterday, review progress, daily catch-up, or /catch-up."
+description: "Daily reviewer for the dependency-aware GitHub Issues queue. Confirms the current repository is clean and on main before fast-forwarding it, reconstructs the actual product changes shipped in each merged PR, reports active and blocked work, inspects stalled lanes, starts the primary repository's dev server on an available port, and explains where to look at relevant frontend and backend changes without running feature tests. Use on a daily cron or on demand: catch me up, what happened yesterday, review progress, daily catch-up, or /catch-up."
 ---
 
 # Catch Up
 
 A reviewer for the parallel-agent GitHub Issues queue. It reconstructs the work done since it last ran, diagnoses lanes that stalled (usually killed mid-flight by usage limits), starts the primary repository's dev server for review, records everything in `progress/progress.md`, and prints a tight summary so you can review and decide what to resume.
 
-It is the **reporting counterpart** to `/start-next-issue`: that skill *consumes* the queue and owns the resume path; this skill updates only the primary worktree with a safe fast-forward and otherwise observes. It never reclaims, relabels, comments on, or mutates GitHub or any lane's git state. All judgment calls are surfaced as recommendations, never actions.
+It is the **reporting counterpart** to `/start-next-issue`: that skill *consumes* the queue and owns the resume path; this skill fast-forwards the current worktree only after confirming it is clean and already on `main`, and otherwise observes. It never switches branches, stashes changes, reclaims or relabels issues, comments on GitHub, or mutates any lane's git state. All judgment calls are surfaced as recommendations, never actions.
 
 Runs against the **current repo**, cron-invoked or by hand. Re-running the same day is safe — the window is "since last run," so a second run just reports a near-empty window.
 
@@ -28,9 +28,9 @@ Stop with a clear message if any fail:
 Do this before resolving the reporting window, inspecting lanes, or starting any server:
 
 1. Resolve the primary repository root with `git rev-parse --show-toplevel` and run every command in this step from that root.
-2. Require an empty `git status --porcelain`. If the primary worktree has staged, unstaged, or untracked changes, stop and report them; never stash, discard, or commit them.
-3. Require the checked-out branch to equal the GitHub default branch captured in Preconditions. If it differs or is detached, stop rather than updating the wrong branch.
-4. Run `git pull --ff-only origin <default-branch>` and show its real result. If the branch has diverged, authentication fails, or the pull otherwise fails, stop before any later step. Never rebase or create a merge commit.
+2. Read the current branch without changing it. If it is not exactly `main` or HEAD is detached, pause and ask the user how to proceed. Do not switch branches, checkout files, or stash anything before asking. Continue only after the user has explicitly put the worktree on `main` or gives new instructions.
+3. Once on `main`, require an empty `git status --porcelain`. If the worktree has staged, unstaged, or untracked changes, pause and ask the user how to proceed. Report the changes, but do not stash, discard, commit, or otherwise modify them without explicit direction.
+4. Only when the worktree is clean and on `main`, run `git pull --ff-only origin main` and show its real result. If the branch has diverged, authentication fails, or the pull otherwise fails, stop before any later step. Never rebase or create a merge commit.
 
 Do not update stalled-lane worktrees. The successful fast-forward is the only permitted git mutation.
 
@@ -177,7 +177,7 @@ Point resumable lanes at `/start-next-issue`; flag escalation candidates (multi-
 This skill is just the body — wire scheduling separately so it stays runnable on demand. One-time setup: register a daily job that, in the target repo, invokes `/catch-up` (Claude Code's scheduler, Codex's equivalent, or system `cron` running the agent non-interactively). Because the window is "since last run," a missed day is automatically absorbed into the next run rather than lost.
 
 ## Notes
-- **Constrained local mutation:** update only the clean primary default-branch worktree with `git pull --ff-only`. Never mutate GitHub or any lane's git state. Other local writes are limited to `progress/progress.md`, its dev-server log, and a `.gitignore` line. Starting and health-checking the dev server are the only process or application side effects; do not run feature tests during catch-up.
+- **Constrained local mutation:** update only a clean worktree already on `main` with `git pull --ff-only origin main`. Never switch branches or stash changes automatically; ask the user first when the current state is unsuitable. Never mutate GitHub or any lane's git state. Other local writes are limited to `progress/progress.md`, its dev-server log, and a `.gitignore` line. Starting and health-checking the dev server are the only process or application side effects; do not run feature tests during catch-up.
 - **Provider-agnostic by construction:** lanes are found via `git worktree list` + branch-prefix match, and the dev command via `AGENTS.md`/`CLAUDE.md`, so Claude- and Codex-created lanes are handled identically. Never hardcode a worktree directory.
 - Lanes worked on another host have no local worktree — report from GitHub and say so; don't treat absence as "never started."
 - **`gh` ≥ 2.94.0** — older `gh` can't return the dependency/state fields; fail loudly.
