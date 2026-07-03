@@ -73,10 +73,9 @@ Re-read the issue. If you are **not the sole assignee**, you lost the race -- dr
 ### 4. Work it
 - Fetch and branch from **fresh** `<default-branch>` (`git fetch && git switch -c <n>-<slug> origin/<default-branch>`). One issue -> one worktree -> one branch.
 - Implement the slice to its acceptance criteria.
-- Open the PR with `Closes #<n>` in the body, then queue auto-merge:
+- Open the PR with `Closes #<n>` in the body:
   ```bash
   gh pr create --head <n>-<slug> --title "<title>" --body "Closes #<n>"
-  gh pr merge <pr> --auto --squash --delete-branch
   ```
 
 ### 5. Babysit CI -- do NOT fire-and-forget
@@ -84,11 +83,15 @@ Watch the required `test` check to completion:
 ```bash
 gh pr checks <pr> --watch
 ```
-- **Green** -> auto-merge fires server-side. Don't just trust the queued auto-merge -- confirm it actually landed:
+- **Green** -> merge it yourself right now, do not queue and wait, do not leave it open as a PR:
+  ```bash
+  gh pr merge <pr> --merge --delete-branch
+  ```
+  Merge commit, not squash -- every commit stays visible on `<default-branch>`. Confirm it landed:
   ```bash
   gh pr view <pr> --json state --jq .state
   ```
-  Poll every ~15s until this reads `MERGED`. Then prune the worktree and go to step 6.
+  Must read `MERGED`. If it doesn't (branch out of date, protection rule, etc.), resolve and retry the merge -- don't move on with an open PR. Then prune the worktree and go to step 6.
 - **Reproducible failure** -> pull the logs (`gh run view --log-failed`), fix on the branch, push, re-watch. **Max 3 fix attempts.** A failure that passes on a plain re-run is flaky and does **not** count against the 3.
 - **Still red after 3 attempts** -> comment the failure on the issue (what failed + what you tried), label it `blocked`, leave it assigned, and **STOP THE CHAIN ENTIRELY.** Do not hand off to another agent -- this lane now waits for a human.
 
