@@ -1,13 +1,13 @@
 ---
 name: catch-up
-description: "Daily reviewer for the dependency-aware GitHub Issues queue. Reconstructs the actual product changes shipped in each merged PR, what's still in progress, and what's blocked since the last run; inspects stalled lanes, starts the primary repository's dev server on an available port, and explains where to look at relevant frontend and backend changes without running feature tests. Use on a daily cron or on demand: catch me up, what happened yesterday, review progress, daily catch-up, or /catch-up."
+description: "Daily reviewer for the dependency-aware GitHub Issues queue. Fast-forwards the clean primary repository, reconstructs the actual product changes shipped in each merged PR, reports active and blocked work, inspects stalled lanes, starts the primary repository's dev server on an available port, and explains where to look at relevant frontend and backend changes without running feature tests. Use on a daily cron or on demand: catch me up, what happened yesterday, review progress, daily catch-up, or /catch-up."
 ---
 
 # Catch Up
 
 A reviewer for the parallel-agent GitHub Issues queue. It reconstructs the work done since it last ran, diagnoses lanes that stalled (usually killed mid-flight by usage limits), starts the primary repository's dev server for review, records everything in `progress/progress.md`, and prints a tight summary so you can review and decide what to resume.
 
-It is the **reporting counterpart** to `/start-next-issue`: that skill *consumes* the queue and owns the resume path; this skill only *observes*. It never reclaims, relabels, comments on, or otherwise mutates GitHub or any lane's git state. The only runtime side effect is starting the requested dev server. All judgment calls are surfaced as recommendations, never actions.
+It is the **reporting counterpart** to `/start-next-issue`: that skill *consumes* the queue and owns the resume path; this skill updates only the primary worktree with a safe fast-forward and otherwise observes. It never reclaims, relabels, comments on, or mutates GitHub or any lane's git state. All judgment calls are surfaced as recommendations, never actions.
 
 Runs against the **current repo**, cron-invoked or by hand. Re-running the same day is safe — the window is "since last run," so a second run just reports a near-empty window.
 
@@ -23,7 +23,18 @@ Stop with a clear message if any fail:
   gh repo view --json nameWithOwner,defaultBranchRef --jq '{repo:.nameWithOwner, branch:.defaultBranchRef.name}'
   ```
 
-## 1. Resolve the window
+## 1. Update the primary repository
+
+Do this before resolving the reporting window, inspecting lanes, or starting any server:
+
+1. Resolve the primary repository root with `git rev-parse --show-toplevel` and run every command in this step from that root.
+2. Require an empty `git status --porcelain`. If the primary worktree has staged, unstaged, or untracked changes, stop and report them; never stash, discard, or commit them.
+3. Require the checked-out branch to equal the GitHub default branch captured in Preconditions. If it differs or is detached, stop rather than updating the wrong branch.
+4. Run `git pull --ff-only origin <default-branch>` and show its real result. If the branch has diverged, authentication fails, or the pull otherwise fails, stop before any later step. Never rebase or create a merge commit.
+
+Do not update stalled-lane worktrees. The successful fast-forward is the only permitted git mutation.
+
+## 2. Resolve the window
 
 The window is **last-run → now**.
 - Read `last-run:` from the top of `progress/progress.md`.
@@ -32,7 +43,7 @@ The window is **last-run → now**.
 
 The window is variable — every header and the progress entry must state the **actual** range, never the word "yesterday".
 
-## 2. Gather the work (GitHub — read only)
+## 3. Gather the work (GitHub — read only)
 
 Three reads, all bounded by the window where the API allows it:
 
@@ -53,9 +64,9 @@ gh issue list --state open --label blocked     --json number,title --limit 100
 
 For every PR in the exact window, inspect its commits and changed files with `gh pr view <n> --json body,commits,files`. Derive what users or operators can now do from the diff, tests, PR body, and commit messages. Do not treat the PR title or linked issue title as sufficient evidence. Group closely related edits into one concise, concrete bullet per PR. Mention multiple shipped behaviors within that bullet when necessary, but omit issue and PR numbers from the shipped-content list.
 
-Tie merged PRs back to issues via `closingIssuesReferences` (the `Closes #n` linkage). An `in-progress` open issue with no open/merged PR is a **stalled lane** - the focus of step 3.
+Tie merged PRs back to issues via `closingIssuesReferences` (the `Closes #n` linkage). An `in-progress` open issue with no open/merged PR is a **stalled lane** - the focus of step 4.
 
-## 3. Diagnose each in-progress lane (worktree — read only, provider-agnostic)
+## 4. Diagnose each in-progress lane (worktree — read only, provider-agnostic)
 
 For every open `in-progress` issue `#n`, map it to its worktree and inspect **in place**. Never `switch`, `stash`, `commit`, or `checkout` inside a lane — leave it exactly as the stalled agent left it.
 
@@ -84,7 +95,7 @@ Synthesize a one-line **diagnosis** — where the lane died and what a resume pi
 
 **Stall age** = age of the lane: oldest of (last-commit age, first time this lane appeared in `progress/progress.md`'s active block). A lane stalled across multiple runs is an **escalation candidate** — surface it.
 
-## 4. Resolve and start the primary dev server
+## 5. Resolve and start the primary dev server
 
 Resolve the command in order and cache it in the progress header:
 1. **Agent workflow doc** — grep `AGENTS.md` or `CLAUDE.md` (bootstrap symlinks them together) for a declared run command. Authoritative if present.
@@ -103,7 +114,7 @@ Inspect the merged PRs' changed routes, components, endpoints, jobs, logs, and d
 
 Keep these as inspection directions, not a test plan: do not run feature tests, exercise user flows, send API test requests, mutate data, or claim behavior was validated. The startup health check may only confirm that the dev server is reachable. Omit either side when it is not applicable, and never invent frontend or backend impact.
 
-## 5. Update `progress/progress.md`
+## 6. Update `progress/progress.md`
 
 Local derived log — **gitignored**, never committed (every fact is reconstructable from GitHub; committing it churns and conflicts across parallel agents). Ensure `progress/` is in `.gitignore`; add it if missing.
 
@@ -132,7 +143,7 @@ dev-pid: <PID or n/a>
 
 Carry a lane's **first-seen** date forward across runs (read it from the previous Active block) so stall age survives.
 
-## 6. Print the summary
+## 7. Print the summary
 
 Concise, sectioned, empty sections collapsed to a one-liner or omitted. Recommendations appear **only** where action is warranted (step's read-only invariant — you decide):
 
@@ -166,7 +177,7 @@ Point resumable lanes at `/start-next-issue`; flag escalation candidates (multi-
 This skill is just the body — wire scheduling separately so it stays runnable on demand. One-time setup: register a daily job that, in the target repo, invokes `/catch-up` (Claude Code's scheduler, Codex's equivalent, or system `cron` running the agent non-interactively). Because the window is "since last run," a missed day is automatically absorbed into the next run rather than lost.
 
 ## Notes
-- **Read-only queue review:** never mutate GitHub or any lane's git state. Local writes are limited to `progress/progress.md`, its dev-server log, and a `.gitignore` line. Starting and health-checking the dev server are the only process or application side effects; do not run feature tests during catch-up.
+- **Constrained local mutation:** update only the clean primary default-branch worktree with `git pull --ff-only`. Never mutate GitHub or any lane's git state. Other local writes are limited to `progress/progress.md`, its dev-server log, and a `.gitignore` line. Starting and health-checking the dev server are the only process or application side effects; do not run feature tests during catch-up.
 - **Provider-agnostic by construction:** lanes are found via `git worktree list` + branch-prefix match, and the dev command via `AGENTS.md`/`CLAUDE.md`, so Claude- and Codex-created lanes are handled identically. Never hardcode a worktree directory.
 - Lanes worked on another host have no local worktree — report from GitHub and say so; don't treat absence as "never started."
 - **`gh` ≥ 2.94.0** — older `gh` can't return the dependency/state fields; fail loudly.
