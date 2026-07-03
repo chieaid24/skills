@@ -1,6 +1,6 @@
 ---
 name: catch-up
-description: "Daily reviewer for the dependency-aware GitHub Issues queue. Reconstructs the actual product changes shipped in each merged PR, what's still in progress, and what's blocked since the last run; inspects stalled lanes, starts the primary repository's dev server on an available port, and gives UI review hints. Use on a daily cron or on demand: catch me up, what happened yesterday, review progress, daily catch-up, or /catch-up."
+description: "Daily reviewer for the dependency-aware GitHub Issues queue. Reconstructs the actual product changes shipped in each merged PR, what's still in progress, and what's blocked since the last run; inspects stalled lanes, starts the primary repository's dev server on an available port, and explains where to look at relevant frontend and backend changes without running feature tests. Use on a daily cron or on demand: catch me up, what happened yesterday, review progress, daily catch-up, or /catch-up."
 ---
 
 # Catch Up
@@ -96,7 +96,12 @@ Unless the user specifies another worktree or target, start the server from the 
 
 Launch it as a durable background process with stdout and stderr redirected to a log under `progress/`, and record its PID. Avoid starting a duplicate if a healthy server for the same root is already running; reuse it and report its URL. Verify startup from real output and, when it serves HTTP, make an HTTP request to the reported URL. If startup fails, inspect the log, try another free port when the failure is a port race, and otherwise report the concrete error. Do not claim the server is running without verification. Leave a successfully started server running after the catch-up completes.
 
-Inspect the merged PRs' changed UI routes, components, labels, and user flows. Provide a short "Where to look" list with exact pages, navigation paths, controls, or visible states that changed. Omit this section when no UI changed; never invent UI impact from backend-only changes.
+Inspect the merged PRs' changed routes, components, endpoints, jobs, logs, and data flows. Provide an observational walkthrough that tells the user where to look at the shipped work:
+
+- **Frontend:** give the dev-server URL plus exact navigation paths, pages, controls, and visible states that changed.
+- **Backend:** when applicable, identify the relevant API route or API-docs page, server log, worker/job view, admin surface, or datastore location and explain how to reach or observe it. Do not provide `curl` commands or ask the user to manufacture requests unless no browsable or passive inspection surface exists.
+
+Keep these as inspection directions, not a test plan: do not run feature tests, exercise user flows, send API test requests, mutate data, or claim behavior was validated. The startup health check may only confirm that the dev server is reachable. Omit either side when it is not applicable, and never invent frontend or backend impact.
 
 ## 5. Update `progress/progress.md`
 
@@ -148,7 +153,8 @@ Concise, sectioned, empty sections collapsed to a one-liner or omitted. Recommen
 - Running at `<verified-url>` from `<primary-repo-root>` (PID `<pid>`, log `<log-path>`)
 
 **Where to look**
-- Orders -> All orders: use the new selection checkboxes, then filter the table and confirm the selection remains.
+- Frontend: open `<verified-url>/orders`, then look at Orders -> All orders. The shipped controls are the selection checkboxes and bulk-action toolbar.
+- Backend: open `<verified-url>/api/docs` and find `POST /orders/bulk`; request handling is visible in `<log-path>` under the `orders.bulk` entries.
 
 Progress log → progress/progress.md
 ```
@@ -160,7 +166,7 @@ Point resumable lanes at `/start-next-issue`; flag escalation candidates (multi-
 This skill is just the body — wire scheduling separately so it stays runnable on demand. One-time setup: register a daily job that, in the target repo, invokes `/catch-up` (Claude Code's scheduler, Codex's equivalent, or system `cron` running the agent non-interactively). Because the window is "since last run," a missed day is automatically absorbed into the next run rather than lost.
 
 ## Notes
-- **Read-only queue review:** never mutate GitHub or any lane's git state. Local writes are limited to `progress/progress.md`, its dev-server log, and a `.gitignore` line. The dev server is the only process side effect.
+- **Read-only queue review:** never mutate GitHub or any lane's git state. Local writes are limited to `progress/progress.md`, its dev-server log, and a `.gitignore` line. Starting and health-checking the dev server are the only process or application side effects; do not run feature tests during catch-up.
 - **Provider-agnostic by construction:** lanes are found via `git worktree list` + branch-prefix match, and the dev command via `AGENTS.md`/`CLAUDE.md`, so Claude- and Codex-created lanes are handled identically. Never hardcode a worktree directory.
 - Lanes worked on another host have no local worktree — report from GitHub and say so; don't treat absence as "never started."
 - **`gh` ≥ 2.94.0** — older `gh` can't return the dependency/state fields; fail loudly.
