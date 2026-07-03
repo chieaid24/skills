@@ -16,7 +16,7 @@ Native GitHub `blocked-by` relationships determine work order.
 | **spec** | Pipeline entry: grill a rough idea -> sharpen domain language + write ADRs -> publish `[PRD]` issue -> suggest `/to-issue`. |
 | **to-prd** | Synthesize already-grilled context into a `[PRD]` issue. Invoked automatically by `/spec`; use directly only if grilling was done separately. |
 | **to-issue** | Create one or many dependency-aware issues from a task description or plan. Auto-detects single vs batch; always reconciles against the open graph (both directions); quizzes before publishing; labels each issue HITL or AFK. |
-| **start-next-issue** | Self-looping worker: grab the most-blocking ready issue -> work it -> babysit CI -> merge -> repeat. |
+| **start-next-issue** | Iteration-capped worker: grab the most-blocking ready issue -> work it -> babysit CI -> merge -> hand off to a fresh-context agent for the next, up to 3 total. |
 | **catch-up** | Daily read-only reviewer: reconstruct what shipped / is in progress / is blocked since the last run, diagnose stalled lanes from their worktrees, log to `progress/progress.md`, print a summary with per-lane dev commands. |
 
 ## How it works

@@ -1,23 +1,24 @@
 ---
 name: start-next-issue
-description: Self-looping worker that grabs the next ready issue from the dependency-aware GitHub queue, works it to a green-CI merge, then takes the next — until stopped. Optionally accepts an issue number (/start-next-issue 42) or plain-text description (/start-next-issue "fix auth bug") to target a specific issue on the first iteration. Use when the user wants an agent to autonomously work the issue queue, "work the next issue", "start working issues", run the agent loop, or invokes /start-next-issue.
+description: Iteration-capped worker for the dependency-aware GitHub queue -- grabs the next ready issue, drives it to a merged PR, then hands off to a fresh-context agent for up to 3 iterations total before stopping. Optionally accepts an issue number (/start-next-issue 42) or plain-text description (/start-next-issue "fix auth bug") to target a specific issue on the first iteration. Use when the user wants an agent to work a bounded batch of issues from the queue, "work the next few issues", run a capped agent chain, or invokes /start-next-issue.
 ---
 
 # Start Next Issue
 
-A self-looping worker for the dependency-aware GitHub Issues queue. Point each parallel agent (Claude Code or Codex CLI) at this; it grabs one ready issue, drives it to a merged PR, then loops to the next, running until stopped (by you, or by usage limits).
+A bounded worker for the dependency-aware GitHub Issues queue. Point an agent (Claude Code or Codex CLI) at this; it grabs one ready issue, drives it to a merged PR, then hands off to a **fresh-context agent** to take the next one -- for **up to 3 iterations total**, then the chain stops.
 
-Requires **`gh` >= 2.94.0**. The queue conventions are documented in the repo's CLAUDE.md "Parallel agent workflow" section — this skill executes them. Capture `<owner>/<repo>` and `<default-branch>` once at the start.
+Requires **`gh` >= 2.94.0**. The queue conventions are documented in the repo's CLAUDE.md "Parallel agent workflow" section -- this skill executes them. Capture `<owner>/<repo>` and `<default-branch>` once at the start.
 
-## Arguments (first iteration only)
+## Arguments
 
 | Invocation | Behaviour |
 |---|---|
-| `/start-next-issue` | Normal — most-blocking-first selection (steps 1-2) |
-| `/start-next-issue 42` | Pin to issue #42 — skip steps 1-2, go straight to step 2a |
-| `/start-next-issue "fix auth bug"` | Fuzzy-match title against open issues — skip steps 1-2, go straight to step 2a |
+| `/start-next-issue` | Start a new 3-iteration chain at `1/3` -- normal most-blocking-first selection (steps 1-2) |
+| `/start-next-issue 42` | Start a new chain, pinned to issue #42 for iteration `1/3` only -- skip steps 1-2, go straight to step 2a |
+| `/start-next-issue "fix auth bug"` | Start a new chain, fuzzy-matched to issue title for iteration `1/3` only -- skip steps 1-2, go straight to step 2a |
+| `/start-next-issue --iteration <n>/3` | **Internal** -- set by a prior agent's handoff (step 6). This is iteration `<n>` of an already-running chain; not meant to be typed by a user. |
 
-For pinned starts (number or description), the argument applies **only to the first iteration**. Subsequent loop iterations use normal most-blocking-first selection.
+Any invocation without `--iteration` starts a **fresh 3-iteration budget** at `1/3`, whether pinned or not. A pin (issue number or description) only ever applies to iteration `1/3` -- a handed-off agent always uses normal selection (steps 1-2).
 
 ## The loop
 
@@ -26,9 +27,9 @@ Before grabbing anything new, check whether **you** already hold work:
 ```bash
 gh issue list --state open --assignee @me --json number,title,labels --limit 20
 ```
-If an issue assigned to you is `in-progress` with an unmerged or missing PR, **resume it** (re-enter steps 4-5 for that issue) instead of grabbing a new one. This is the usage-limit resume path — finish the paused lane before taking more.
+If an issue assigned to you is `in-progress` with an unmerged or missing PR, **resume it** (re-enter steps 4-5 for that issue) instead of grabbing a new one -- this is the usage-limit resume path (see Stopping). Otherwise continue to step 1 (or step 2a if this is a pinned iteration `1/3`).
 
-### 1. Compute the ready set (mechanical — no LLM)
+### 1. Compute the ready set (mechanical -- no LLM)
 ```bash
 gh issue list --state open --json number,title,labels,assignees,blockedBy --limit 100
 ```
@@ -37,9 +38,9 @@ An issue is **ready** iff ALL of:
 - it has **no assignee**, AND
 - every issue in its `blockedBy` is closed with `stateReason == completed` (resolve blocker state with `gh issue view <blocker> --json state,stateReason`).
 
-As a side-effect of this read, report **ready-set width** and any **zombies** (assigned + `in-progress` + no open PR). Width below the number of running agents is a refinement signal (the DAG is too deep — re-slice). Zombies are usually paused lanes — **leave them, do not reclaim**.
+As a side-effect of this read, report **ready-set width** and any **zombies** (assigned + `in-progress` + no open PR). Width below the number of running agents is a refinement signal (the DAG is too deep -- re-slice). Zombies are usually paused lanes -- **leave them, do not reclaim**.
 
-### 2. Select — most-blocking first
+### 2. Select -- most-blocking first
 Pick the ready issue whose completion unblocks the **most** downstream issues: for each candidate `C`, count open issues `X` where `C ∈ X.blockedBy` (invert the `blockedBy` data you already fetched). Highest count wins; tiebreak lowest issue number. This keeps the other agents fed.
 
 ### 2a. Pinned start (only when an argument was given)
@@ -58,7 +59,7 @@ Score each open issue by title similarity to the argument (exact substring match
 
 **Validation (both cases):**
 - Issue must be open.
-- Issue must be unassigned (or assigned only to you — resume path).
+- Issue must be unassigned (or assigned only to you -- resume path).
 - If any blocker is open, warn the user and ask whether to proceed anyway or pick a different issue. Do not silently skip blockers.
 
 On a valid pinned target, proceed to step 3 with that issue number.
@@ -67,7 +68,7 @@ On a valid pinned target, proceed to step 3 with that issue number.
 ```bash
 gh issue edit <n> --add-assignee @me
 ```
-Re-read the issue. If you are **not the sole assignee**, you lost the race — drop it and return to step 2 for the next ready issue. On a clean claim, swap labels `ready` -> `in-progress`.
+Re-read the issue. If you are **not the sole assignee**, you lost the race -- drop it and return to step 2 for the next ready issue. On a clean claim, swap labels `ready` -> `in-progress`.
 
 ### 4. Work it
 - Fetch and branch from **fresh** `<default-branch>` (`git fetch && git switch -c <n>-<slug> origin/<default-branch>`). One issue -> one worktree -> one branch.
@@ -78,25 +79,45 @@ Re-read the issue. If you are **not the sole assignee**, you lost the race — d
   gh pr merge <pr> --auto --squash --delete-branch
   ```
 
-### 5. Babysit CI — do NOT fire-and-forget
+### 5. Babysit CI -- do NOT fire-and-forget
 Watch the required `test` check to completion:
 ```bash
 gh pr checks <pr> --watch
 ```
-- **Green** -> auto-merge fires server-side; prune the worktree; go to step 0/1 for the next issue.
+- **Green** -> auto-merge fires server-side. Don't just trust the queued auto-merge -- confirm it actually landed:
+  ```bash
+  gh pr view <pr> --json state --jq .state
+  ```
+  Poll every ~15s until this reads `MERGED`. Then prune the worktree and go to step 6.
 - **Reproducible failure** -> pull the logs (`gh run view --log-failed`), fix on the branch, push, re-watch. **Max 3 fix attempts.** A failure that passes on a plain re-run is flaky and does **not** count against the 3.
-- **Still red after 3 attempts** -> comment the failure on the issue (what failed + what you tried), label it `blocked`, leave it assigned, and **STOP THE LOOP ENTIRELY.** Do not grab another issue — this lane now waits for a human.
+- **Still red after 3 attempts** -> comment the failure on the issue (what failed + what you tried), label it `blocked`, leave it assigned, and **STOP THE CHAIN ENTIRELY.** Do not hand off to another agent -- this lane now waits for a human.
+
+### 6. Hand off (fresh context) or stop
+Only reached once the PR is confirmed `MERGED` in step 5.
+
+- **This was iteration `3/3`** -> stop. Report the issue(s)/PR(s) merged across the chain, then exit. Do not grab another issue.
+- **Iterations remain** -> launch iteration `<n+1>/3` as a **new agent with a fresh context window**. It must not inherit this conversation -- only the handful of facts below. Use whichever spawn mechanism your environment provides:
+  - **Claude Code:** the Agent tool with a non-fork agent type (e.g. `general-purpose`), so it starts with zero memory of this run.
+  - **Codex CLI or any environment without a built-in spawn tool:** exec a new non-interactive session of your own CLI as a subprocess (e.g. `codex exec`, `claude -p`), then end this session once it's launched.
+
+  Give the new agent exactly this, nothing more:
+  - the instruction to run `/start-next-issue --iteration <n+1>/3`
+  - `<owner>/<repo>` and `<default-branch>`
+
+  Your own run ends here -- do not loop back to step 0 yourself. The new agent's step 0/1 rediscovers current queue state from `gh` independently.
 
 ## Stopping
 
-- **Ready set empty but open issues remain** (all blocked or claimed) -> **poll with backoff**: re-read every ~60s; resume when one becomes ready.
-- **No open issues remain** -> the queue is drained -> **exit** and say so.
-- **3-strike CI failure** -> halt (step 5).
-- **Usage limits** kill the session mid-issue -> it leaves a paused `in-progress` claim (out of the ready set, so siblings ignore it). Re-invoke `/start-next-issue` when limits reset — step 0 resumes the paused lane.
+- **Iteration `3/3` merged** -> chain complete, stop (step 6).
+- **Ready set empty but open issues remain** (all blocked or claimed) -> **poll with backoff** within the current iteration: re-read every ~60s; resume when one becomes ready. This does not consume an iteration or trigger a handoff.
+- **No open issues remain** -> the queue is drained -> **exit** and say so, regardless of iteration count.
+- **3-strike CI failure** -> halt the whole chain (step 5). Do not hand off.
+- **Usage limits** kill the session mid-issue -> it leaves a paused `in-progress` claim (out of the ready set, so siblings ignore it). Re-invoke `/start-next-issue --iteration <n>/3` (the same `n` the killed agent was on) when limits reset -- step 0 resumes the paused lane and the remaining budget continues. If you don't know `n`, a bare `/start-next-issue` is safe too -- it just starts a fresh 3-iteration budget.
 
 ## Notes
-- **Crash-safe by construction:** the ready set IS the resume state — no checkpoint file. A kill leaves at most one in-progress issue, recovered by step 0.
-- **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, that's fine — it rebases at its own merge gate.
-- One issue per branch/PR — never batch.
+- **Crash-safe by construction:** the ready set IS the resume state for *which issue* is in flight -- no checkpoint file. A kill leaves at most one in-progress issue, recovered by step 0.
+- **Iteration count is chain state, not repo state:** it lives only in the `--iteration` handoff argument passed between agents, not in GitHub. If a chain dies before handoff fires, the count is lost -- re-invoking bare just starts a new 3-iteration budget, which is harmless.
+- **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, that's fine -- it rebases at its own merge gate.
+- One issue per branch/PR -- never batch.
 - This skill only **consumes** the queue. Authoring/edges are `/to-issue`.
-- `gh` >= 2.94.0 — older `gh` returns no `blockedBy` and the ready set is silently wrong; fail loudly.
+- `gh` >= 2.94.0 -- older `gh` returns no `blockedBy` and the ready set is silently wrong; fail loudly.
