@@ -122,5 +122,5 @@ Only reached once the PR is confirmed `MERGED` in step 5.
 - **Iteration count is chain state, not repo state:** it lives only in the `--iteration` handoff argument passed between agents, not in GitHub. If a chain dies before handoff fires, the count is lost -- re-invoking bare just starts a new 3-iteration budget, which is harmless.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, that's fine -- it rebases at its own merge gate.
 - One issue per branch/PR -- never batch.
-- This skill only **consumes** the queue. Authoring/edges are `/to-issue`.
+- This skill only **consumes** the queue. Authoring/edges are `/spec`.
 - `gh` >= 2.94.0 -- older `gh` returns no `blockedBy` and the ready set is silently wrong; fail loudly.

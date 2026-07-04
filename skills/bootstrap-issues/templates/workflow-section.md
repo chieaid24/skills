@@ -3,7 +3,7 @@
 Work is a **dependency-aware GitHub Issues queue** (on `origin`), not a `/tasks` folder — issues give atomic claim semantics and state visible across parallel worktrees. Runs locally on **Claude Code or Codex CLI interchangeably**. Requires `gh` ≥ 2.94.0 (for `blockedBy`/`stateReason` JSON).
 
 **Authoring the queue**
-- Turn context into a PRD with `to-prd`, then split with `to-issues` (batch) or add one with `/to-issue` (incremental) — one issue = one tracer-bullet vertical slice.
+- Author the queue with `/spec`: it grills the idea, then routes by scope — a PRD with child slices for large features, or one or a few issues directly for small changes — one issue = one tracer-bullet vertical slice.
 - **Dependencies are native GitHub `blocked-by` edges**, and **only model true logical dependencies** ("B needs A's code to exist"), never file contention. When unsure whether B depends on A, *add* the edge — a false edge just costs parallelism; a missing edge sends an agent to build on absent code.
 - The human approves the dependency DAG once, up front; after that agents run with no per-issue human beat.
 

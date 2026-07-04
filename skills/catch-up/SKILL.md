@@ -181,4 +181,4 @@ This skill is just the body — wire scheduling separately so it stays runnable 
 - **Provider-agnostic by construction:** lanes are found via `git worktree list` + branch-prefix match, and the dev command via `AGENTS.md`/`CLAUDE.md`, so Claude- and Codex-created lanes are handled identically. Never hardcode a worktree directory.
 - Lanes worked on another host have no local worktree — report from GitHub and say so; don't treat absence as "never started."
 - **`gh` ≥ 2.94.0** — older `gh` can't return the dependency/state fields; fail loudly.
-- Complements `/start-next-issue` (consumes the queue) and `to-issues`/`to-issue` (fill it). This skill only observes.
+- Complements `/start-next-issue` (consumes the queue) and `/spec` (fills it). This skill only observes.
