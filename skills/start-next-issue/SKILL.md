@@ -95,8 +95,24 @@ gh pr checks <pr> --watch
 - **Reproducible failure** -> pull the logs (`gh run view --log-failed`), fix on the branch, push, re-watch. **Max 3 fix attempts.** A failure that passes on a plain re-run is flaky and does **not** count against the 3.
 - **Still red after 3 attempts** -> comment the failure on the issue (what failed + what you tried), label it `blocked`, leave it assigned, and **STOP THE CHAIN ENTIRELY.** Do not hand off to another agent -- this lane now waits for a human.
 
+### 5a. Close the parent PRD if it's fully delivered
+Only after a confirmed merge. The merged PR's `Closes #<n>` already closed the child issue; now check whether that closed the **last** child of its PRD.
+
+If the just-closed issue named a parent PRD in its `## Parent` field (call it `#<P>`), scan for siblings still open:
+```bash
+# P = parent PRD number from the merged issue's `## Parent`
+gh issue list --state open --json number,body --limit 200 \
+  --jq '[.[] | select(.body | test("#'"$P"'\\b"))] | .[].number'
+```
+Treat only issues that name `#<P>` as their **parent** as children (ignore incidental mentions). If **no** open child remains, close the PRD as delivered:
+```bash
+gh issue close <P> --reason completed \
+  --comment "All child issues delivered; closing PRD #<P>."
+```
+If any child is still open, or the merged issue had no parent PRD, leave the PRD as is. **Never close a PRD that still has an open child.**
+
 ### 6. Hand off (fresh context) or stop
-Only reached once the PR is confirmed `MERGED` in step 5.
+Only reached once the PR is confirmed `MERGED` in step 5 (and any drained PRD closed in step 5a).
 
 - **This was iteration `3/3`** -> stop. Report the issue(s)/PR(s) merged across the chain, then exit. Do not grab another issue.
 - **Iterations remain** -> launch iteration `<n+1>/3` as a **new agent with a fresh context window**. It must not inherit this conversation -- only the handful of facts below. Use whichever spawn mechanism your environment provides:
