@@ -1,9 +1,10 @@
-# Agent Skills for dependency-aware development
+# Aidan's Agent Skills
 
-Portable Agent Skills for running a parallel development workflow through a dependency-aware
-GitHub Issues queue. Works with Codex, Claude Code, and other agents that implement the open
-Agent Skills format. Each worker claims a ready issue, works it to a green-CI merge, then takes
-the next. Native GitHub `blocked-by` relationships determine work order.
+The skills I use for my agentic development workflow. 
+
+Spec out the requirements with a grilling session,
+create GitHub Issues and PRDs for auditability, run your agents autonomously, 
+keep yourself in the loop.
 
 ## The skills
 
