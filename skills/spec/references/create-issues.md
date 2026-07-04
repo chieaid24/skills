@@ -1,18 +1,21 @@
----
-name: to-issue
-description: Create one or more dependency-aware issues from a task description or plan. Auto-detects single vs batch from context. Always reconciles against the open graph (blocked-by and blocking edges in both directions), runs a quiz loop before publishing, and labels each issue HITL or AFK. Use for "add an issue", "create a ticket", "break this plan into issues", or /to-issue. For a single issue this is a lighter loop; for a plan or PRD it breaks into tracer-bullet vertical slices.
----
+# Create-issues reference
 
-# To Issue
+The shared issue-creation flow. Both `/spec` routes converge here:
 
-Create dependency-aware issues — one or many — and slot them into the existing queue. Always reconciles against the open graph; always quizzes before publishing.
+- **PRD path** — a `[PRD]` issue was just published (see `references/prd.md`). Source is the PRD;
+  run **batch mode** with the PRD as parent.
+- **Issues-only path** — a small change; no PRD. Source is the grilled context; run **single mode**
+  (one slice) or a **small batch** (a few independent slices), with no parent.
 
-## 0. Detect mode
+Create dependency-aware issues — one or many — and slot them into the existing queue. Always
+reconcile against the open graph; always quiz before publishing.
 
-Scan the conversation context:
+## 0. Confirm mode
 
-- **Batch** — a plan, spec, or PRD is present (or an issue reference with the `prd` label is passed as an argument). Break into tracer-bullet vertical slices.
-- **Single** — a specific task description is present with no decomposition needed. Create one issue.
+- **Batch** — a plan or PRD is the source. Break into tracer-bullet vertical slices. (PRD path is
+  always batch; the small path may also be a small batch when grilling surfaced a few independent
+  tasks.)
+- **Single** — one specific change with no decomposition needed. Create one issue.
 
 If ambiguous, ask.
 
@@ -20,7 +23,7 @@ If ambiguous, ask.
 
 - Git repo with GitHub `origin`; `gh` authenticated; **`gh` >= 2.94.0** (needs `--add-blocked-by` / `--add-blocking` and `blockedBy` JSON fields).
 - Capture `<owner>/<repo>` via `gh repo view --json nameWithOwner`.
-- If an issue reference is passed as an argument, fetch its full body and comments.
+- On the PRD path, you already have the PRD issue number; use it as the parent for every child.
 
 ## 1. Explore (optional)
 
@@ -39,7 +42,7 @@ Break the plan into tracer-bullet slices. Each slice must:
 - Be demoable or verifiable on its own
 - Prefer many thin slices over few thick ones
 
-For large decompositions, consider a **parent issue** that scopes the overall work with child issues as individual slices (each child references it in `## Parent`). Small standalone tasks need no parent. If the source is a PRD issue (labelled `prd`), record its number as the parent for every child.
+For large decompositions, consider a **parent issue** that scopes the overall work with child issues as individual slices (each child references it in `## Parent`). Small standalone tasks need no parent. On the PRD path, record the PRD issue number as the parent for every child.
 
 ### Label each draft HITL or AFK
 

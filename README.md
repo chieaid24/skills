@@ -11,9 +11,7 @@ the next. Native GitHub `blocked-by` relationships determine work order.
 |---|---|
 | **bootstrap-issues** | One-shot repo setup: CI test gate, work-queue labels, branch protection with self-merge, issue template, pre-commit hooks, `AGENTS.md`/`CLAUDE.md` docs. |
 | **setup-pre-commit** | Stack-aware pre-commit hook: format -> lint -> test. Called by `bootstrap-issues`; runs standalone too. |
-| **spec** | Grill a rough idea -> sharpen domain language + write ADRs -> publish `[PRD]` issue -> suggest `/to-issue`. |
-| **to-prd** | Synthesize already-grilled context into a `[PRD]` issue. |
-| **to-issue** | Create dependency-linked issues from a task description or plan. Reconciles the open graph, quizzes before publishing, labels HITL or AFK. |
+| **spec** | Grill a rough idea -> sharpen domain language + write ADRs -> route by scope: publish a `[PRD]` issue with child slices for large features, or create one or a few dependency-linked issues directly for small changes. Reconciles the open graph, quizzes before publishing, labels HITL or AFK. |
 | **start-next-issue** | Iteration-capped worker: grab the most-blocking ready issue -> work it -> babysit CI -> merge -> hand off to a fresh-context agent for the next, up to 3 total. |
 | **catch-up** | Daily read-only reviewer: what shipped/in-progress/blocked, diagnose stalled lanes, log to `progress/progress.md`. |
 
@@ -40,8 +38,8 @@ Install specific skills instead of `'*'` by repeating `--skill`. List available 
 `npx skills add chieaid24/skills --list`.
 
 Then, in a target repo: `/bootstrap-issues` to set up the queue, `/spec` to shape an idea into a
-PRD, `/to-issue` to create work, `/start-next-issue` to work the queue, `/catch-up` to review
-progress.
+PRD with child issues (or straight into one or a few issues for small changes), `/start-next-issue`
+to work the queue, `/catch-up` to review progress.
 
 ## Update
 

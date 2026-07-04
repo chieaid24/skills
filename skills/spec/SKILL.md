@@ -1,13 +1,14 @@
 ---
 name: spec
-description: "Full pipeline entry point for a new feature: interrogate the idea (sharpening domain language, writing ADRs as decisions crystallize), then synthesize into a [PRD] issue and suggest /to-issue to slice it into actionable work. Use when starting from a rough idea toward a dependency-linked issue queue."
+description: "Full pipeline entry point for a new feature or change: interrogate the idea (sharpening domain language, writing ADRs as decisions crystallize), then route by scope — publish a [PRD] issue with child work slices for large features, or go straight to one or a few dependency-linked issues for small changes. Both converge on the same issue-creation flow. Use when starting from a rough idea toward a dependency-linked issue queue."
 ---
 
 # Spec
 
-Pipeline: rough idea → grill → docs updated → PRD published → `/to-issue` suggested.
+Pipeline: rough idea → grill → docs updated → **route by scope** → issues published.
 
-Runs two sequential phases. Do not skip to Phase 2 until Phase 1 is complete.
+Runs three sequential phases. Do not skip ahead until the prior phase is complete. Phase 3 reads
+bundled references — do not inline their content here, follow the files.
 
 ---
 
@@ -48,70 +49,41 @@ Use `docs/adr/NNNN-slug.md` format (increment from existing highest number).
 
 ---
 
-## Phase 2: PRD
+## Phase 2: Route by scope
 
-When grilling is complete and the user is satisfied with the decisions, transition to the PRD without re-interviewing. Synthesize what was established; publish in one shot.
+When grilling is complete and the user is satisfied with the decisions, classify the scope. Do NOT
+re-interview — synthesize what was established. Announce the route with a one-line rationale; let
+the user override.
 
-### Steps
+- **PRD path** — pick when any hold: multiple user stories or actors; ADR-level decisions emerged;
+  the work spans many slices; a durable spec others will reference adds value. A `[PRD]` issue is
+  worth the overhead.
+- **Issues-only path** — pick for small changes: one cohesive change, or a few independent small
+  tasks; the decisions fit inside the issue body itself; no ADR-level choices. Skip the PRD.
 
-1. Read the freshly updated `CONTEXT.md` and any ADRs written during Phase 1. Use the canonical terms throughout the PRD. Surface relevant ADRs under Implementation Decisions.
+State the decision, e.g.:
 
-2. Write the PRD using the template below.
+> Scope: large — three user stories and an ADR on the sync boundary. Taking the PRD path.
 
-3. Publish as a GitHub issue:
-   ```bash
-   gh issue create --title "[PRD] <feature name>" --body-file "$TMPDIR/prd-body.md" --label prd
-   ```
-   Delete the temp file after creation.
+or
 
-4. Report the issue number and suggest next step:
-   > PRD published as #<n>. Run `/to-issue <n>` to break it into dependency-linked work slices.
+> Scope: small — a single self-contained change. Skipping the PRD, going straight to one issue.
 
-### PRD template
+---
 
-<prd-template>
+## Phase 3: Publish
 
-## Problem Statement
+### PRD path
 
-The problem the user is facing, from the user's perspective.
+1. Follow `references/prd.md` to write and publish the `[PRD]` issue. Note its number.
+2. Continue to `references/create-issues.md` in **batch mode**, using the PRD as the parent for
+   every child slice.
 
-## Solution
+### Issues-only path
 
-The solution, from the user's perspective.
+Go straight to `references/create-issues.md` — **single mode** for one slice, or a **small batch**
+for a few independent slices. No PRD, no parent.
 
-## User Stories
-
-A numbered list of user stories covering all aspects of the feature:
-
-1. As a <actor>, I want <feature>, so that <benefit>
-
-## Implementation Decisions
-
-Decisions made during the grilling session. Include:
-
-- Modules to build or modify
-- Interface changes
-- Architectural decisions (reference any ADRs written during Phase 1)
-- Schema changes
-- API contracts
-- Key interactions
-
-Do NOT include specific file paths or code snippets — they go stale.
-
-Exception: if a prototype produced a snippet that encodes a decision more precisely than prose can (state machine, reducer, schema, type shape), inline it and note it came from a prototype. Trim to decision-rich parts only.
-
-## Testing Decisions
-
-- What makes a good test for this feature (test external behavior, not implementation details)
-- Which seams to test at (prefer existing high seams; note any new ones proposed)
-- Prior art in the codebase for similar tests
-
-## Out of Scope
-
-Things explicitly excluded from this PRD.
-
-## Further Notes
-
-Any remaining context, open questions, or follow-up considerations.
-
-</prd-template>
+Both paths converge on `references/create-issues.md`: the single shared flow for drafting
+tracer-bullet slices, reconciling the open dependency graph, quizzing the user, publishing in
+dependency order, and reporting grabbable vs waiting work.
