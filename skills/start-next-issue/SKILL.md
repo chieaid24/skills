@@ -76,11 +76,31 @@ Score each open issue by title similarity to the argument (exact substring match
 
 On a valid pinned target, proceed to step 3 with that issue number.
 
-### 3. Claim atomically
+### 3. Claim atomically -- serialize with a local lock, then assign
+Agents on this machine share **one `gh` login**, so the assignee set alone cannot tell "I claimed
+it" from "another agent on the same account claimed it" -- both would re-read a single `@me`
+assignee and both conclude they won, then duplicate the work. Gate the claim with an atomic
+filesystem lock in the shared git dir (visible to every agent working this clone). `mkdir` is atomic,
+so exactly one agent enters the critical section per issue:
 ```bash
-gh issue edit <n> --add-assignee @me
+lockdir="$(git rev-parse --git-common-dir)/claim-locks"; mkdir -p "$lockdir"
+if mkdir "$lockdir/<n>" 2>/dev/null; then
+  # won the lock -- re-read GitHub state INSIDE the lock (this is what makes claim atomic)
+  gh issue view <n> --json assignees,labels,state
+  # proceed only if still open, unassigned (or only you), and still labelled `ready`:
+  gh issue edit <n> --add-assignee @me
+  gh issue edit <n> --remove-label ready --add-label in-progress
+  rmdir "$lockdir/<n>"   # release -- the in-progress label now gates every other agent
+else
+  # lock is held. If the issue is NOT actually assigned + in-progress, it is a stale lock from a
+  # crashed agent: rmdir "$lockdir/<n>" and retry once. Otherwise you lost the race -- drop it and
+  # return to step 2 for the next ready issue.
+fi
 ```
-Re-read the issue. If you are **not the sole assignee**, you lost the race -- drop it and return to step 2 for the next ready issue. On a clean claim, swap labels `ready` -> `in-progress`.
+Re-reading the issue **inside** the lock is what closes the check-to-claim gap. Hold the lock only
+across the assign + label swap (a second or two), then release it -- the durable, cross-agent
+visible claim is the `in-progress` label + assignee, not the lock. Do not open a worktree or start
+work (step 4) until you hold a confirmed clean claim.
 
 ### 4. Work it -- in a dedicated worktree, never in the shared checkout
 See **Worktree isolation** above: the shared checkout's branch is off-limits. One issue -> one

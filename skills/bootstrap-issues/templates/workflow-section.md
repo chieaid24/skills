@@ -17,7 +17,7 @@ Work is a **dependency-aware GitHub Issues queue** (on `origin`), not a `/tasks`
 
 **`/start-next-issue` — the worker loop** (point each agent at this; it self-loops until stopped)
 1. Read the ready set; pick the **most-blocking** issue (unblocks the most dependents; tiebreak lowest #).
-2. **Claim atomically**: assign self → re-read → if not the sole assignee, drop it and take the next. Set `in-progress`.
+2. **Claim atomically**: agents share one `gh` account, so the assignee alone can't distinguish two claimers — gate with an atomic local lock (`mkdir "$(git rev-parse --git-common-dir)/claim-locks/<issue#>"`). Winner re-reads inside the lock, assigns self, sets `in-progress`, releases; a loser drops it and takes the next.
 3. Branch from fresh `<default-branch>` → `<issue#>-<slug>`. One issue → one worktree → one PR with `Closes #<issue>`.
 4. Code it, open the PR, then **babysit CI**: watch the `test` check; on a reproducible failure, fix on the branch, push, re-check. **Max 3 attempts** (flaky re-runs are free). Still red → write the failure into the issue, label `blocked`, and **stop the loop** (don't grab anything else).
 5. On green it auto-merges (`gh pr merge <pr> --auto --squash --delete-branch`); prune the worktree, then loop to the next.
