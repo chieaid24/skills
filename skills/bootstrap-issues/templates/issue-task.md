@@ -35,6 +35,7 @@ labels: ready
 
 - [ ] CI `test` check green
 - [ ] Verified locally if runtime behavior or UI changes
+- [ ] Frontend/UI changes conform to `DESIGN.md`
 - [ ] PR on branch `<issue#>-<slug>` with `Closes #<this issue>`
 
 ## Notes / context
