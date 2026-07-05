@@ -20,6 +20,18 @@ Requires **`gh` >= 2.94.0**. The queue conventions are documented in the repo's 
 
 Any invocation without `--iteration` starts a **fresh 3-iteration budget** at `1/3`, whether pinned or not. A pin (issue number or description) only ever applies to iteration `1/3` -- a handed-off agent always uses normal selection (steps 1-2).
 
+## Worktree isolation -- the one hard rule
+
+Other agents share this clone and are working in it **right now**. You therefore **never change the
+branch of the shared checkout** -- no `git switch`, no `git checkout <branch>`, no `git switch -c`
+in place. Switching branches under the shared checkout yanks the working tree out from under the
+other agents.
+
+Each issue instead gets its **own `git worktree`** under `.worktrees/<n>-<slug>`. Every bit of its
+work -- edits, commits, pushes, the PR, CI fixes -- happens **inside that worktree**, and it stays
+there until the PR is merged into `<default-branch>` and the worktree is removed. If you ever catch
+yourself about to switch branches in the primary checkout, stop and `git worktree add` instead.
+
 ## The loop
 
 ### 0. Resume check (run first, and after any restart)
@@ -27,7 +39,7 @@ Before grabbing anything new, check whether **you** already hold work:
 ```bash
 gh issue list --state open --assignee @me --json number,title,labels --limit 20
 ```
-If an issue assigned to you is `in-progress` with an unmerged or missing PR, **resume it** (re-enter steps 4-5 for that issue) instead of grabbing a new one -- this is the usage-limit resume path (see Stopping). Otherwise continue to step 1 (or step 2a if this is a pinned iteration `1/3`).
+If an issue assigned to you is `in-progress` with an unmerged or missing PR, **resume it** (re-enter steps 4-5 for that issue) instead of grabbing a new one -- this is the usage-limit resume path (see Stopping). Its worktree under `.worktrees/` likely still exists: `git worktree list`, then `cd` back into it rather than recreating it (do not switch the shared checkout). Otherwise continue to step 1 (or step 2a if this is a pinned iteration `1/3`).
 
 ### 1. Compute the ready set (mechanical -- no LLM)
 ```bash
@@ -70,10 +82,22 @@ gh issue edit <n> --add-assignee @me
 ```
 Re-read the issue. If you are **not the sole assignee**, you lost the race -- drop it and return to step 2 for the next ready issue. On a clean claim, swap labels `ready` -> `in-progress`.
 
-### 4. Work it
-- Fetch and branch from **fresh** `<default-branch>` (`git fetch && git switch -c <n>-<slug> origin/<default-branch>`). One issue -> one worktree -> one branch.
-- Implement the slice to its acceptance criteria.
-- Open the PR with `Closes #<n>` in the body:
+### 4. Work it -- in a dedicated worktree, never in the shared checkout
+See **Worktree isolation** above: the shared checkout's branch is off-limits. One issue -> one
+worktree -> one branch.
+
+- Fetch, then add a worktree on a new branch cut from **fresh** `<default-branch>` -- this does NOT
+  touch the shared checkout's branch:
+  ```bash
+  git fetch origin
+  git worktree add -b <n>-<slug> .worktrees/<n>-<slug> origin/<default-branch>
+  ```
+  If that branch/worktree already exists (usage-limit resume, step 0), reuse it instead of
+  re-adding -- `git worktree list` to find its path.
+- `cd .worktrees/<n>-<slug>` and stay inside it for the rest of this issue. Every edit, commit, and
+  push happens here, never in the shared checkout.
+- Implement the slice to its acceptance criteria and commit.
+- Open the PR (from inside the worktree) with `Closes #<n>` in the body:
   ```bash
   gh pr create --head <n>-<slug> --title "<title>" --body "Closes #<n>"
   ```
@@ -91,8 +115,8 @@ gh pr checks <pr> --watch
   ```bash
   gh pr view <pr> --json state --jq .state
   ```
-  Must read `MERGED`. If it doesn't (branch out of date, protection rule, etc.), resolve and retry the merge -- don't move on with an open PR. Then prune the worktree and go to step 6.
-- **Reproducible failure** -> pull the logs (`gh run view --log-failed`), fix on the branch, push, re-watch. **Max 3 fix attempts.** A failure that passes on a plain re-run is flaky and does **not** count against the 3.
+  Must read `MERGED`. If it doesn't (branch out of date, protection rule, etc.), resolve and retry the merge -- don't move on with an open PR. Then `cd` back to the shared checkout root and remove the worktree -- `git worktree remove .worktrees/<n>-<slug>` (add `--force` if it refuses; `git branch -D <n>-<slug>` if the local branch lingers) -- and go to step 6.
+- **Reproducible failure** -> pull the logs (`gh run view --log-failed`), fix **in the worktree**, push, re-watch. **Max 3 fix attempts.** A failure that passes on a plain re-run is flaky and does **not** count against the 3.
 - **Still red after 3 attempts** -> comment the failure on the issue (what failed + what you tried), label it `blocked`, leave it assigned, and **STOP THE CHAIN ENTIRELY.** Do not hand off to another agent -- this lane now waits for a human.
 
 ### 5a. Close the parent PRD if it's fully delivered
@@ -137,6 +161,6 @@ Only reached once the PR is confirmed `MERGED` in step 5 (and any drained PRD cl
 - **Crash-safe by construction:** the ready set IS the resume state for *which issue* is in flight -- no checkpoint file. A kill leaves at most one in-progress issue, recovered by step 0.
 - **Iteration count is chain state, not repo state:** it lives only in the `--iteration` handoff argument passed between agents, not in GitHub. If a chain dies before handoff fires, the count is lost -- re-invoking bare just starts a new 3-iteration budget, which is harmless.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, that's fine -- it rebases at its own merge gate.
-- One issue per branch/PR -- never batch.
+- One issue per worktree/branch/PR -- never batch. The shared checkout's branch is never switched (see **Worktree isolation**).
 - This skill only **consumes** the queue. Authoring/edges are `/spec`.
 - `gh` >= 2.94.0 -- older `gh` returns no `blockedBy` and the ready set is silently wrong; fail loudly.
