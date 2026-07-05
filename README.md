@@ -10,7 +10,7 @@ keep yourself in the loop.
 
 | Skill | What it does |
 |---|---|
-| **bootstrap-issues** | One-shot repo setup: CI test gate, work-queue labels, branch protection with self-merge, issue template, pre-commit hooks, `AGENTS.md`/`CLAUDE.md` docs. |
+| **bootstrap-issues** | One-shot repo setup: CI test gate, work-queue labels, branch protection with self-merge, issue template, pre-commit hooks, `AGENTS.md`/`CLAUDE.md` docs, and a grilled `DESIGN.md` design system that binds every future UI change (frontend repos). |
 | **setup-pre-commit** | Stack-aware pre-commit hook: format -> lint -> test. Called by `bootstrap-issues`; runs standalone too. |
 | **spec** | Grill a rough idea -> sharpen domain language + write ADRs -> route by scope: publish a `[PRD]` issue with child slices for large features, or create one or a few dependency-linked issues directly for small changes. Reconciles the open graph, quizzes before publishing, labels HITL or AFK. |
 | **start-next-issue** | Iteration-capped worker: grab the most-blocking ready issue -> work it -> babysit CI -> merge -> hand off to a fresh-context agent for the next, up to 3 total. |
