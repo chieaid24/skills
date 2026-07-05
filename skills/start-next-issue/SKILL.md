@@ -34,6 +34,19 @@ yourself about to switch branches in the primary checkout, stop and `git worktre
 
 ## The loop
 
+### Before the loop -- normalize output style (run first, every iteration)
+This skill authors PRs, issue comments, and CI-fix reasoning that other people and agents read; they
+must be plain, full English, not a compressed "caveman"/brevity style that some environments enable
+globally. Before anything else, disable any such mode for this working session:
+```bash
+rm -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.caveman-active"
+```
+This is the exact effect of `/caveman off` -- the plugin re-reads that flag each turn, so removing it
+stops the per-turn brevity injection. A harmless no-op if the flag (or the plugin) is absent. Run it
+at the **start of every iteration**, not just `1/3`: handed-off agents (step 6) launch as fresh
+sessions whose `SessionStart` hook re-creates the flag from the configured default. Then write in
+normal prose for the rest of the chain.
+
 ### 0. Resume check (run first, and after any restart)
 Before grabbing anything new, check whether **you** already hold work:
 ```bash
