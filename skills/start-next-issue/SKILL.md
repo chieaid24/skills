@@ -135,6 +135,33 @@ worktree -> one branch.
   gh pr create --head <n>-<slug> --title "<title>" --body "Closes #<n>"
   ```
 
+### 4a. Own the whole platform, not just your slice
+You are not a narrow ticket-closer -- you are an owner of the entire product. While you implement and
+**validate** your slice (running the app, exercising the flow end-to-end, reading the code your change
+touches and the code around it), keep your eyes open for anything else that is broken, regressed, or
+visibly wrong **anywhere on the platform** -- a crash, a broken flow, a wrong result, a mangled or
+misaligned UI, a dead link, a failing or flaky test in another area, a lint error you happen to pass
+through. Assume nobody else will catch it; treat it as yours the moment you see it.
+
+**When you spot such a thing, fix it autonomously -- even though it is out of scope for your assigned
+issue** -- right here in this worktree, and ship it in the **same PR**. Do not file it away for
+"later," do not leave it for another agent, do not ask permission first. In the PR body, keep the
+`Closes #<n>` line for your assigned issue, then add an **`## Out-of-scope fixes`** section listing
+each drive-by fix (what was broken, where, what you changed) so the reviewer sees exactly what rode
+along and why.
+
+Guardrails so ownership does not sink the lane:
+- **Your assigned issue's acceptance criteria still gate the PR.** Drive-by fixes ride along; they
+  never replace or dilute the slice you claimed.
+- **Keep each fix contained and safe.** A drive-by fix is a tight, obviously-correct correction, not
+  an open-ended refactor. If a problem is genuinely too large to fix safely inline -- it needs its
+  own design, has a wide blast radius, or would put the assigned issue's merge or the 3-attempt CI
+  budget (step 5) at risk -- then do not force it into this PR: file a new `ready` queue issue with a
+  clear repro and file/location so a future agent picks it up. Filing is the escape hatch for the big
+  ones; **fixing inline is the default for everything else.**
+- Everything still happens **inside this worktree** on this branch -- the Worktree isolation rule is
+  absolute, and platform ownership never means touching the shared checkout.
+
 ### 5. Babysit CI -- do NOT fire-and-forget
 Watch the required `test` check to completion:
 ```bash
@@ -194,6 +221,10 @@ Only reached once the PR is confirmed `MERGED` in step 5 (and any drained PRD cl
 - **Crash-safe by construction:** the ready set IS the resume state for *which issue* is in flight -- no checkpoint file. A kill leaves at most one in-progress issue, recovered by step 0.
 - **Iteration count is chain state, not repo state:** it lives only in the `--iteration` handoff argument passed between agents, not in GitHub. If a chain dies before handoff fires, the count is lost -- re-invoking bare just starts a new 3-iteration budget, which is harmless.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, that's fine -- it rebases at its own merge gate.
-- One issue per worktree/branch/PR -- never batch. The shared checkout's branch is never switched (see **Worktree isolation**).
+- One issue per worktree/branch/PR -- never batch. The one sanctioned exception is a drive-by
+  out-of-scope fix found while validating (step 4a): it rides along in the current PR, listed under
+  `## Out-of-scope fixes`. That is not batching a second claimed issue -- you still never
+  deliberately pull another queue issue's slice into this worktree. The shared checkout's branch is
+  never switched (see **Worktree isolation**).
 - This skill only **consumes** the queue. Authoring/edges are `/spec`.
 - `gh` >= 2.94.0 -- older `gh` returns no `blockedBy` and the ready set is silently wrong; fail loudly.
