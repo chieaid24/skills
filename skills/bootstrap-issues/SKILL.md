@@ -1,6 +1,6 @@
 ---
 name: bootstrap-issues
-description: Bootstrap a repo for parallel autonomous agents coordinated via a dependency-aware GitHub Issues queue — creates work-queue labels, a CI test gate, branch protection with self-merge, an agent issue template, a committed DESIGN.md design system for frontend repos, and the AGENTS.md/CLAUDE.md workflow docs. Use when the user wants to set up the parallel-agent / GitHub Issues flow in a repo, "bootstrap issues", port the agent workflow to a new repo, or invokes /bootstrap-issues.
+description: Bootstrap a repo for parallel autonomous agents coordinated via a dependency-aware GitHub Issues queue — creates work-queue labels (lifecycle plus afk/hitl autonomy), a CI test gate, branch protection with self-merge, an agent issue template, a committed DESIGN.md design system for frontend repos, and the AGENTS.md/CLAUDE.md workflow docs. Use when the user wants to set up the parallel-agent / GitHub Issues flow in a repo, "bootstrap issues", port the agent workflow to a new repo, or invokes /bootstrap-issues.
 ---
 
 # Bootstrap Issues
@@ -48,7 +48,7 @@ Hold the resolved decisions. `DESIGN.md` is written from `templates/design-md.md
 
 Summarize exactly what will change, then ask the user to confirm before applying anything outward-facing:
 - **Files:** `.github/workflows/ci.yml` (chosen template), `.github/ISSUE_TEMPLATE/task.md`. **Frontend repos also:** `DESIGN.md` (committed) from the step-2 interview.
-- **Labels:** `ready`, `in-progress`, `review`, `blocked`.
+- **Labels:** lifecycle — `ready`, `in-progress`, `review`, `blocked`; autonomy — `afk`, `hitl`; `prd` for parent specs.
 - **Docs:** ensure `CLAUDE.md` exists; gitignore `CLAUDE.md` + `AGENTS.md`; symlink `AGENTS.md → CLAUDE.md`; append the **Parallel agent workflow** section (plus the **Frontend / UI work** clause for frontend repos).
 - **Pre-commit hooks:** via the `setup-pre-commit` skill — a stack-aware hook (format → lint → test) that runs before every local commit, mirroring the CI `test` gate. Committed so every agent shares it.
 - **GitHub config:** branch protection on `<default-branch>` requiring the `test` check, **no required reviews** (so an agent merges its own PR); enable auto-merge + delete-branch-on-merge.
@@ -65,12 +65,19 @@ Summarize exactly what will change, then ask the user to confirm before applying
 
 4. **Labels — inline, never a committed script:**
    ```bash
-   gh label create ready       --color 0E8A16 --description "Refined AFK work; grabbable once its blockers are completed" --force
-   gh label create in-progress --color FBCA04 --description "Claimed (assignee) and being worked"                         --force
-   gh label create review      --color 1D76DB --description "PR open, awaiting review/merge"                              --force
-   gh label create blocked     --color B60205 --description "Escalated to a human (abandoned blocker, or CI failed 3x)"   --force
-   gh label create prd         --color 5319E7 --description "Product requirements document; parent of work slice issues"  --force
+   # Lifecycle
+   gh label create ready       --color 0E8A16 --description "Refined and queued; grabbable once its blockers are completed" --force
+   gh label create in-progress --color FBCA04 --description "Claimed (assignee) and being worked"                           --force
+   gh label create review      --color 1D76DB --description "PR open, awaiting review/merge"                                --force
+   gh label create blocked     --color B60205 --description "Escalated to a human (abandoned blocker, or CI failed 3x)"     --force
+   # Autonomy — exactly one per work issue
+   gh label create afk         --color C2E0C6 --description "Fully autonomous: an agent implements, tests, and merges it"   --force
+   gh label create hitl        --color D93F0B --description "Human in the loop required; the autonomous worker skips it"    --force
+   # Parent spec
+   gh label create prd         --color 5319E7 --description "Product requirements document; parent of work slice issues"    --force
    ```
+
+   `afk` and `hitl` replace the old `## Type` body section: the autonomy of an issue is now machine-readable, so `/start-next-issue` can exclude `hitl` from its ready set instead of an agent parsing prose. Every work issue carries exactly one of the two; `prd` parents carry neither.
 
 5. **Commit + land the workflow.** Stage the shareable files (`.github/`, plus `DESIGN.md` for a frontend repo), commit (`chore: add agentic-issues CI + issue template`), and push so `ci.yml` reaches `<default-branch>` (direct push as owner, or open + merge a bootstrap PR — the PR carries the workflow so its own `test` check can run). The pre-commit hook files (step 3) were already committed by that skill; `CLAUDE.md`/`AGENTS.md` are gitignored and stay local, but `DESIGN.md` is committed so every agent shares it.
 
@@ -94,8 +101,9 @@ Remove every one-shot artifact created during bootstrap — the temp protection 
 
 State what changed, anything skipped (e.g. branch protection when the scope was missing + the manual steps; the design interview for a backend-only repo), whether a `DESIGN.md` was written, the pre-commit hook installed and its per-clone activation command (if any), and how the queue runs from here:
 
-- **Fill the queue:** `/spec` — grill the idea → update docs → route by scope: publish a PRD with child slices for large features, or go straight to one or a few issues for small changes. Both reconcile against the open graph.
-- **Work the queue:** point each agent at `/start-next-issue` — it self-loops, grabbing the most-blocking ready issue, working it to a green-CI merge, then taking the next.
+- **Fill the queue:** `/spec` — grill the idea → update docs → route by scope: publish a PRD with child slices for large features, or go straight to one or a few issues for small changes. Both reconcile against the open graph and label each issue `afk` or `hitl`.
+- **Work the queue:** point each agent at `/start-next-issue` — it self-loops, grabbing the most-blocking ready **`afk`** issue, working it to a green-CI merge, then taking the next. `hitl` issues wait for you.
+- **Review the queue:** `/catch-up` — reports what shipped, which lanes stalled, and which `hitl` issues are sitting on a human decision.
 
 ## Notes
 
@@ -104,4 +112,5 @@ State what changed, anything skipped (e.g. branch protection when the scope was 
 - **`DESIGN.md` is the binding design system.** Committed and shared (not gitignored), auto-loaded by `/impeccable` from the repo root, and every future frontend agent must conform to it — the appended **Frontend / UI work** docs point UI work at it.
 - **GitHub-only** (uses `gh`). For repos hosted elsewhere, only the docs + templates apply.
 - Owner direct-pushes to the protected branch bypass the check (`enforce_admins=false`); agents go through PRs and hit the gate.
-- The dependency queue (`blocked-by` edges, the `ready`/`completed` rule, the claim mutex) is described in `templates/workflow-section.md` and consumed by `/start-next-issue`. Keep all three skills (`bootstrap-issues`, `/spec`, `/start-next-issue`) in agreement on those conventions.
+- **`afk` / `hitl` gate autonomy, `ready` gates refinement.** They are orthogonal: a `hitl` issue is still labelled `ready` when it's fully specified. `/start-next-issue` requires `ready` **and** `afk`, so a `hitl` issue never enters the ready set — only a human works it, or relabels it `afk` once the decision it names is settled. That exclusion is why `hitl` can't be a body field: the ready set is a mechanical read, and it can't parse prose.
+- The dependency queue (`blocked-by` edges, the `ready`/`completed` rule, the autonomy labels, the claim mutex) is described in `templates/workflow-section.md` and consumed by `/start-next-issue`. Keep all four skills (`bootstrap-issues`, `/spec`, `/start-next-issue`, `/catch-up`) in agreement on those conventions.

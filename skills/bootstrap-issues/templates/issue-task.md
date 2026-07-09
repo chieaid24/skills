@@ -2,8 +2,13 @@
 name: Agent task
 about: A tracer-bullet slice an agent (Claude Code or Codex CLI) can complete autonomously
 title: ""
-labels: ready
+labels: ready, afk
 ---
+
+<!-- Autonomy is a label, not a body field. This template applies `afk` — fully autonomous:
+     implement, test, and merge with no human involvement (preferred). Swap it for `hitl` when the
+     slice needs a human in the loop (architectural decision, design review, external dependency);
+     `/start-next-issue` skips `hitl` issues, so a human must pick them up. Exactly one of the two. -->
 
 ## Parent
 
@@ -15,11 +20,6 @@ labels: ready
      Avoid specific file paths — they go stale fast. Exception: if a prototype produced a snippet that
      encodes a decision more precisely than prose (state machine, schema, type shape), inline it and
      note it came from a prototype. -->
-
-## Type
-
-<!-- AFK — fully autonomous: implement, test, and merge without human involvement (preferred)
-     HITL — requires human interaction: architectural decision, design review, or external dependency -->
 
 ## Acceptance criteria
 
@@ -40,4 +40,5 @@ labels: ready
 
 ## Notes / context
 
-<!-- Links to specs, ADRs, related issues. -->
+<!-- Links to specs, ADRs, related issues. If this issue is labelled `hitl`, say exactly what human
+     input it needs and who can give it — otherwise whoever picks it up has to work that out. -->

@@ -12,14 +12,15 @@ keep yourself in the loop.
 |---|---|
 | **bootstrap-issues** | One-shot repo setup: CI test gate, work-queue labels, branch protection with self-merge, issue template, pre-commit hooks, `AGENTS.md`/`CLAUDE.md` docs, and a grilled `DESIGN.md` design system that binds every future UI change (frontend repos). |
 | **setup-pre-commit** | Stack-aware pre-commit hook: format -> lint -> test. Called by `bootstrap-issues`; runs standalone too. |
-| **spec** | Grill a rough idea -> sharpen domain language + write ADRs -> route by scope: publish a `[PRD]` issue with child slices for large features, or create one or a few dependency-linked issues directly for small changes. Reconciles the open graph, quizzes before publishing, labels HITL or AFK. |
-| **start-next-issue** | Iteration-capped worker: grab the most-blocking ready issue -> work it -> babysit CI -> merge -> hand off to a fresh-context agent for the next, up to 3 total. |
-| **catch-up** | Daily read-only reviewer: what shipped/in-progress/blocked, diagnose stalled lanes, log to `progress/progress.md`. |
+| **spec** | Grill a rough idea -> sharpen domain language + write ADRs -> route by scope: publish a `[PRD]` issue with child slices for large features, or create one or a few dependency-linked issues directly for small changes. Reconciles the open graph, quizzes before publishing, labels each issue `afk` or `hitl`. |
+| **start-next-issue** | Iteration-capped worker: grab the most-blocking ready `afk` issue -> work it -> babysit CI -> merge -> hand off to a fresh-context agent for the next, up to 3 total. Never touches `hitl`. |
+| **catch-up** | Daily read-only reviewer: what shipped/in-progress/blocked, which `hitl` issues await you, diagnose stalled lanes, log to `progress/progress.md`. |
 
 ## How it works
 
 - Edges are true logical dependencies only (native GitHub `blocked-by`); file contention rides the merge gate via rebase.
-- Ready = labelled `ready`, unassigned, every blocker closed as `completed`.
+- Ready = labelled `ready`, labelled `afk`, unassigned, every blocker closed as `completed`.
+- Autonomy is a label, not prose: `afk` runs unattended, `hitl` waits for you. The worker skips `hitl` so an overnight chain never stalls against an absent human; `/catch-up` lists them so they don't rot.
 - Claim = assignment (atomic). Select = most-blocking-first.
 - CI babysit: 3 fix attempts, then comment + `blocked` + stop the lane.
 

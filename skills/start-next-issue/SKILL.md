@@ -1,6 +1,6 @@
 ---
 name: start-next-issue
-description: Iteration-capped worker for the dependency-aware GitHub queue -- grabs the next ready issue, drives it to a merged PR, then hands off to a fresh-context agent for up to 3 iterations total before stopping. Optionally accepts an issue number (/start-next-issue 42) or plain-text description (/start-next-issue "fix auth bug") to target a specific issue on the first iteration. Use when the user wants an agent to work a bounded batch of issues from the queue, "work the next few issues", run a capped agent chain, or invokes /start-next-issue.
+description: Iteration-capped worker for the dependency-aware GitHub queue -- grabs the next ready `afk` issue (skipping `hitl` issues, which need a human), drives it to a merged PR, then hands off to a fresh-context agent for up to 3 iterations total before stopping. Optionally accepts an issue number (/start-next-issue 42) or plain-text description (/start-next-issue "fix auth bug") to target a specific issue on the first iteration. Use when the user wants an agent to work a bounded batch of issues from the queue, "work the next few issues", run a capped agent chain, or invokes /start-next-issue.
 ---
 
 # Start Next Issue
@@ -44,9 +44,11 @@ If an issue assigned to you is `in-progress` with an unmerged/missing PR, **resu
 ```bash
 gh issue list --state open --json number,title,labels,assignees,blockedBy --limit 100
 ```
-An issue is **ready** iff ALL of: has the `ready` label; has **no assignee**; every `blockedBy` issue is closed with `stateReason == completed` (verify with `gh issue view <blocker> --json state,stateReason`).
+An issue is **ready** iff ALL of: has the `ready` label; has the `afk` label and **not** `hitl`; has **no assignee**; every `blockedBy` issue is closed with `stateReason == completed` (verify with `gh issue view <blocker> --json state,stateReason`).
 
-Side-effect of this read: report **ready-set width** and any **zombies** (assigned + `in-progress` + no open PR). Width below the number of running agents means the DAG is too deep -- re-slice. Leave zombies alone (usually paused lanes -- do not reclaim).
+**`hitl` means a human is on the critical path** -- an architectural call, a design review, an external dependency. Never grab one from the queue, however unblocked it looks: an unattended chain would stall against someone who is away. A human works it directly, or relabels it `afk` once the decision it was waiting on is made.
+
+Side-effect of this read: report **ready-set width** and any **zombies** (assigned + `in-progress` + no open PR). Width below the number of running agents means the DAG is too deep -- re-slice. Leave zombies alone (usually paused lanes -- do not reclaim). Also count open `hitl` issues whose blockers are all `completed` -- these are **waiting on a human**; name them in the report so they don't rot.
 
 ### 2. Select -- most-blocking first
 Pick the ready issue that unblocks the **most** downstream issues: for each candidate `C`, count open `X` where `C ∈ X.blockedBy` (invert the data you already fetched). Highest wins; tiebreak lowest issue number.
@@ -58,6 +60,8 @@ Skip steps 1-2 and resolve the target:
 - **Description** (`"fix auth bug"`): fetch the open list as in step 1, score each title by similarity (exact substring first, then fuzzy), pick the best. If two tie, list both and ask the user.
 
 **Validation (both):** issue must be open; unassigned (or assigned only to you -- resume); if any blocker is open, warn and ask whether to proceed or pick another -- never silently skip blockers. On a valid target, proceed to step 3.
+
+**A pinned `hitl` issue is allowed but never silent.** The `hitl` exclusion exists because nobody is watching an autonomous chain; a pin means the user asked for this issue right now, so a human *is* present. Say the issue is `hitl` and what human input it names, then ask whether to proceed. On approval, work it with the user in the loop: surface each decision the issue flags instead of choosing alone. Handed-off iterations (step 6) use normal selection, so they never inherit the pin -- the chain returns to `afk`-only work.
 
 ### 3. Claim atomically -- local lock, then assign
 Agents here share **one `gh` login**, so the assignee alone can't distinguish "I claimed it" from "another agent on this account did" -- both read `@me` and both think they won. Gate the claim with an atomic `mkdir` lock in the shared git dir so exactly one agent enters the critical section:
@@ -141,7 +145,8 @@ Only reached once the PR is confirmed `MERGED` (step 5) and any drained PRD clos
 ## Stopping
 
 - **Iteration `3/3` merged** -> chain complete, stop.
-- **Ready set empty but open issues remain** (all blocked/claimed) -> **poll with backoff** within the current iteration: re-read ~every 60s, resume when one becomes ready. Doesn't consume an iteration or trigger a handoff.
+- **Ready set empty but open `afk` issues remain** (all blocked or claimed) -> **poll with backoff** within the current iteration: re-read ~every 60s, resume when one becomes ready. Doesn't consume an iteration or trigger a handoff.
+- **Ready set empty and every open issue is `hitl`** -> **exit, don't poll.** No agent action can ever make a `hitl` issue ready; only a human can. List the waiting issues and stop.
 - **No open issues remain** -> queue drained -> exit and say so, regardless of iteration count.
 - **3-strike CI failure** -> halt the whole chain (step 5). No handoff.
 - **Usage limits kill the session mid-issue** -> a paused `in-progress` claim is left (out of the ready set, so siblings ignore it). Re-invoke `/start-next-issue --iteration <n>/3` (same `n`) when limits reset -- step 0 resumes it. If you don't know `n`, a bare `/start-next-issue` is safe (just a fresh budget).
@@ -151,4 +156,6 @@ Only reached once the PR is confirmed `MERGED` (step 5) and any drained PRD clos
 - **Iteration count is chain state, not repo state:** it lives only in the `--iteration` handoff arg. If a chain dies before handoff, the count is lost -- re-invoking bare just starts a new budget, harmless.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, fine -- it rebases at its own merge gate.
 - **One issue per worktree/branch/PR -- never batch.** The one exception is a drive-by out-of-scope fix (step 4a) riding along under `## Out-of-scope fixes`; you still never deliberately pull another queue issue's slice in.
+- **`hitl` is a hard skip, never a judgement call.** The label is the whole test -- don't reason from the body that an issue "looks autonomous enough" and grab it anyway, and don't relabel a `hitl` issue `afk` to unblock yourself. Only a human moves an issue between the two. The sole exception is an explicit pin (step 2a).
+- **An unlabelled work issue is not ready.** Missing both `afk` and `hitl` means `/spec` or a human left it half-triaged; skip it and name it in the report rather than assuming `afk`.
 - This skill only **consumes** the queue. Authoring/edges are `/spec`.

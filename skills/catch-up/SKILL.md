@@ -1,11 +1,11 @@
 ---
 name: catch-up
-description: "Daily reviewer for the dependency-aware GitHub Issues queue. Confirms the current repository is clean and on main before fast-forwarding it, reconstructs the actual product changes shipped in each merged PR, reports active and blocked work, inspects stalled lanes, starts the primary repository's dev server on an available port, and explains where to look at relevant frontend and backend changes without running feature tests. Use on a daily cron or on demand: catch me up, what happened yesterday, review progress, daily catch-up, or /catch-up."
+description: "Daily reviewer for the dependency-aware GitHub Issues queue. Confirms the current repository is clean and on main before fast-forwarding it, reconstructs the actual product changes shipped in each merged PR, reports active, blocked, and human-gated (HITL) work, inspects stalled lanes, starts the primary repository's dev server on an available port, and explains where to look at relevant frontend and backend changes without running feature tests. Use on a daily cron or on demand: catch me up, what happened yesterday, review progress, daily catch-up, or /catch-up."
 ---
 
 # Catch Up
 
-A reviewer for the parallel-agent GitHub Issues queue. It reconstructs the work done since it last ran, diagnoses lanes that stalled (usually killed mid-flight by usage limits), starts the primary repository's dev server for review, records everything in `progress/progress.md`, and prints a tight summary so you can review and decide what to resume.
+A reviewer for the parallel-agent GitHub Issues queue. It reconstructs the work done since it last ran, diagnoses lanes that stalled (usually killed mid-flight by usage limits), surfaces `hitl` issues waiting on a human, starts the primary repository's dev server for review, records everything in `progress/progress.md`, and prints a tight summary so you can review and decide what to resume.
 
 It is the **reporting counterpart** to `/start-next-issue`: that skill *consumes* the queue and owns the resume path; this skill fast-forwards the current worktree only after confirming it is clean and already on `main`, and otherwise observes. It never switches branches, stashes changes, reclaims or relabels issues, comments on GitHub, or mutates any lane's git state. All judgment calls are surfaced as recommendations, never actions.
 
@@ -60,7 +60,12 @@ gh pr list --state merged --search "merged:>=<window-date>" \
 # Active + escalated: open lanes
 gh issue list --state open --label in-progress --json number,title,assignees,updatedAt --limit 100
 gh issue list --state open --label blocked     --json number,title --limit 100
+
+# Awaiting human: issues no agent will ever pick up
+gh issue list --state open --label hitl --json number,title,blockedBy,createdAt,updatedAt --limit 100
 ```
+
+`hitl` issues are excluded from `/start-next-issue`'s ready set by design — a human must work them or relabel them `afk`. Nothing in the automated loop ever touches them, so this report is the **only** thing that keeps them visible. Report each one, whether its blockers are all closed as `completed` (**actionable now**) or some remain open (**still waiting on upstream work**), and its age since creation. An actionable `hitl` issue that also blocks open `afk` issues is stalling the queue behind a human — surface it first, with the count of issues it blocks, and treat multi-run persistence as an escalation.
 
 For every PR in the exact window, inspect its commits and changed files with `gh pr view <n> --json body,commits,files`. Derive what users or operators can now do from the diff, tests, PR body, and commit messages. Do not treat the PR title or linked issue title as sufficient evidence. Group closely related edits into one concise, concrete bullet per PR. Mention multiple shipped behaviors within that bullet when necessary, but omit issue and PR numbers from the shipped-content list.
 
@@ -137,11 +142,13 @@ dev-pid: <PID or n/a>
 - Added bulk selection to the orders table and preserved selections while filtering.
 ### In progress
 - #51 <title> — died mid-implementation, 4 files dirty
+### Awaiting human (HITL)
+- #47 <title> — actionable now, blocks 2 issues — first seen 2026-06-20
 ### Blocked
 - #38 <title> — abandoned blocker #30
 ```
 
-Carry a lane's **first-seen** date forward across runs (read it from the previous Active block) so stall age survives.
+Carry a lane's **first-seen** date forward across runs (read it from the previous Active block) so stall age survives. Do the same for each `hitl` issue: how long it has been awaiting a human is the number that makes it escalate.
 
 ## 7. Print the summary
 
@@ -157,6 +164,10 @@ Concise, sectioned, empty sections collapsed to a one-liner or omitted. Recommen
 - #51 <title> — stalled 1d, 4 files dirty, no PR → resumable via /start-next-issue
 - #42 <title> — stalled 3d ⚠ PR #43 open, CI red → recommend: manual look, likely re-slice
 
+**Awaiting human (N) — HITL, no agent will take these**
+- #47 <title> — actionable 5d ⚠ blocks #48, #52 → decide, then work it or relabel `afk`
+- #55 <title> — waiting on blocker #51
+
 **Blocked (N) — needs you**
 - #38 <title> — abandoned blocker #30
 
@@ -170,7 +181,7 @@ Concise, sectioned, empty sections collapsed to a one-liner or omitted. Recommen
 Progress log → progress/progress.md
 ```
 
-Point resumable lanes at `/start-next-issue`; flag escalation candidates (multi-run stalls, CI-dead) for a human decision.
+Point resumable lanes at `/start-next-issue`; flag escalation candidates (multi-run stalls, CI-dead, long-actionable `hitl`) for a human decision. For each actionable `hitl` issue, the recommendation is always one of two things a human does: work it directly, or settle the decision it names and relabel it `afk` so an agent can. Recommend only — never relabel it yourself.
 
 ## Running on a cron
 
