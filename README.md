@@ -15,6 +15,8 @@ keep yourself in the loop.
 | **spec** | Grill a rough idea -> sharpen domain language + write ADRs -> route by scope: publish a `[PRD]` issue with child slices for large features, or create one or a few dependency-linked issues directly for small changes. Reconciles the open graph, quizzes before publishing, labels each issue `afk` or `hitl`. |
 | **start-next-issue** | Iteration-capped worker: grab the most-blocking ready `afk` issue -> work it -> babysit CI -> merge -> hand off to a fresh-context agent for the next, up to 3 total. Never touches `hitl`. |
 | **catch-up** | Daily read-only reviewer: what shipped/in-progress/blocked, which `hitl` issues await you, diagnose stalled lanes, log to `progress/progress.md`. |
+| **improve-codebase-architecture** | Scan the codebase for deepening opportunities (shallow modules -> deep modules), present them as a visual HTML report, then grill through the one you pick. Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). |
+| **security-audit** | Multi-agent security audit of a codebase: reconnaissance, attack-class hunting, validation, and a schema-checked findings report. Targets exploitable issues with real impact. Vendored from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT). |
 
 ## How it works
 
