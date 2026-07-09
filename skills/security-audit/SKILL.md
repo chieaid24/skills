@@ -20,9 +20,27 @@ Use the platform's equivalent capabilities while preserving the specified roles,
 
 ## Setup
 
-Before starting, establish two paths:
-- **Target**: the codebase to audit (from the user's request or the current working directory)
-- **Output directory**: where all audit artifacts go. Ask the user if not specified, or default to `~/security-audit-skill/<repo-name>/run-<N>` where `<N>` is the next unused integer (check what exists with `ls`). Create it if it doesn't exist. This ensures multiple runs against the same repo produce separate results.
+This skill audits a **git worktree** — a disposable checkout pinned to a single commit — so every run examines a clean, reproducible snapshot without touching your working tree, uncommitted changes, or current branch. Create one per run.
+
+Before starting, establish the audit worktree, then the two paths.
+
+### Create the audit worktree
+
+Run `ls ~/security-audit-skill/<repo-name>/` first to find `<N>`, the next unused run integer. Use the same `<N>` for both the worktree and the output directory. Then, from inside the target repository:
+
+1. **Pick the ref.** Default to the tip of the default branch: `git fetch`, then use `origin/main` (or `main`/`master`/`origin/HEAD` as the repo uses). If the user named a branch, tag, or commit, audit that instead.
+2. **Add the worktree** under the repo's own `.worktrees/` directory (never `.claude/worktrees`):
+   ```
+   git worktree add .worktrees/security-audit-run-<N> <ref>
+   ```
+3. **Record the commit.** `git -C .worktrees/security-audit-run-<N> rev-parse HEAD` — pin the run to this SHA so periodic runs can be compared commit-to-commit. Record it in `architecture.md`.
+
+If the target is not a git repository, audit it in place and note that the isolation and reproducibility guarantees do not hold.
+
+### Paths
+
+- **Target**: the worktree checkout (`.worktrees/security-audit-run-<N>`). Every Phase 1 and Phase 2 agent reads code from here, not from the live working tree.
+- **Output directory**: where all audit artifacts go. It lives **outside** the worktree so it survives cleanup and accumulates run history across weeks. Default to `~/security-audit-skill/<repo-name>/run-<N>` (ask the user if they want a different location). Create it if it does not exist, and use the same `<N>` as the worktree. **Never write artifacts inside the worktree** — they would be destroyed at cleanup and could be committed by accident. Because reports contain live vulnerability detail, the output directory must never be committed into the repo.
 
 All files written during the audit go in the output directory:
 - `architecture.md` — Phase 1 output, fed into Phase 2 agent prompts
@@ -40,6 +58,7 @@ Each audit run explores different code paths depending on which agents find what
 1. **Skip known findings** — don't waste agents re-discovering the same status bypass. Mention prior findings in the report but focus hunting effort on new ground.
 2. **Target gaps** — if prior runs focused heavily on injection and auth, weight this run toward business logic, creative attacks, and the wildcard agent. If prior runs missed public endpoints, focus there.
 3. **Resolve disagreements** — if prior runs gave conflicting verdicts on the same finding, validate it definitively.
+4. **Diff since the last run** — this skill is meant to run on a schedule (e.g. weekly), so compare the ref you are auditing against the previous run's recorded SHA: `git -C .worktrees/security-audit-run-<N> log --oneline <prev-sha>..HEAD`. Weight extra hunting effort toward code that changed since the last audit. In Phase 4, tag each finding's status relative to the previous run — **new**, **still open** (reported before, still present), or **regressed** (previously fixed, now back) — and list prior findings that are now fixed as **resolved**. This week-over-week delta is the main value of running periodically.
 
 Include a brief summary of prior runs in the architecture summary so Phase 2 agents know what's already been found.
 
@@ -91,6 +110,16 @@ Follow all six phases in order:
 4. **Report** — Use Phase 4 in [VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md) to write `REPORT.md` and `FINDINGS-DETAIL.md`.
 5. **Structured output** — Use Phase 5 in [VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md), `report-schema.json`, and `validate-findings.cjs` to write and validate `findings.json`.
 6. **Independent verification** — Use Phase 6 in [VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md) to verify every factual claim and reconcile all outputs.
+
+## Cleanup
+
+Once Phase 6 is complete and all artifacts are written to the output directory, remove the worktree — nothing of value lives inside it:
+
+```
+git worktree remove .worktrees/security-audit-run-<N>
+```
+
+If `git` refuses because of leftover files, artifacts were written to the wrong place — they belong in the output directory, not the worktree. Move them out, then remove. Keep the output directory: it is the run history that powers the prior-run comparison above. To revisit a past run, re-create the worktree at that run's recorded SHA.
 
 ## Anti-Patterns to Avoid
 
