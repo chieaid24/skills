@@ -1,9 +1,9 @@
 ---
-name: improve-codebase-architecture
-description: Autonomous architecture-improvement pass. Explore the codebase for deepening opportunities (shallow modules to deep modules), delegate behavior-preserving refactors to subagents, and continuously verify that nothing changed from the consumer side by keeping unit, integration, and E2E suites green. Use for unattended architecture cleanup, "improve the architecture", or agent-driven refactoring runs.
+name: code-audit
+description: Autonomous architecture-improvement pass. Explore the codebase for deepening opportunities (shallow modules to deep modules), delegate behavior-preserving refactors to subagents, and continuously verify that nothing changed from the consumer side by keeping unit, integration, and E2E suites green. Use for unattended architecture cleanup, "audit the code", "improve the architecture", agent-driven refactoring runs, or /code-audit.
 ---
 
-# Improve Codebase Architecture
+# Code Audit
 
 You are running unattended. Your job: surface architectural friction, execute **deepening
 refactors** (turn shallow modules into deep ones) through implementation subagents, and prove at
