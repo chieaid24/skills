@@ -16,6 +16,7 @@ keep yourself in the loop.
 | **start-next-issue** | Iteration-capped orchestrator: the main agent grabs the most-blocking ready `afk` issue -> works it -> babysits CI -> merges, then dispatches a fresh-context worker per remaining issue (up to 3 total), halting the run on any failure. Never touches `hitl`. |
 | **catch-up** | Daily read-only reviewer: what shipped/in-progress/blocked, which `hitl` issues await you, diagnose stalled lanes, log to `progress/progress.md`. |
 | **improve-codebase-architecture** | Autonomous architecture pass: explore for deepening opportunities (shallow modules -> deep modules), delegate behavior-preserving refactors to subagents, verify after every change that the consumer contract held (unit + integration + E2E stay green), revert what can't be proven. Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). |
+| **fix-ui-drift** | Autonomous visual consistency pass: screenshot every flow with the repo's own E2E runner, measure defects (misalignment, overlap, clipping, contrast) and drift from `DESIGN.md` or the app's dominant pattern, then repair each finding through a subagent and prove it with a committed probe that was red before and green after. |
 | **security-audit** | Multi-agent security audit of a codebase: reconnaissance, attack-class hunting, validation, and a schema-checked findings report. Targets exploitable issues with real impact. Vendored from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT). |
 | **writing-great-skills** | Reference for writing and editing skills: invocation trade-offs, description triggers, the steps-vs-reference information hierarchy, completion criteria, with a full `GLOSSARY.md` of the vocabulary. Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). |
 
@@ -32,6 +33,8 @@ keep yourself in the loop.
 - Node.js, npm, `gh` >= 2.94.0, `git` >= 2.13 (the issue-queue claim lock needs `--force-with-lease` with an empty expect).
 - A GitHub repository with an `origin` remote.
 - A GitHub token scoped to the skill in use (`bootstrap-issues` needs Contents, Issues, Pull requests, Administration).
+- `fix-ui-drift` drives a browser: it reuses the repo's Playwright or Cypress config when there is
+  one, and otherwise installs Playwright with headless Chromium.
 
 ## Install
 

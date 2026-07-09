@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "Single source of truth for ui-findings.json (see SKILL.md steps 3 and 4). The run ends when every finding reaches a terminal status. 'open' is not terminal.",
+  "title": "fix-ui-drift ledger",
+  "type": "object",
+  "required": ["schema_version", "run", "repo", "commit", "design_system", "flows", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run": { "type": "integer", "minimum": 1 },
+    "repo": { "type": "string" },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "SHA the run branched from, so two runs can be compared."
+    },
+    "design_system": {
+      "type": "boolean",
+      "description": "Whether DESIGN.md was present. False means the only drift authority was the dominant pattern."
+    },
+    "flows": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Every route accounted for: captured, or unreachable with a reason.",
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "source": { "enum": ["e2e-spec", "route-discovery"] },
+          "routes": { "type": "array", "items": { "type": "string" } },
+          "viewports": { "type": "array", "items": { "type": "string" } },
+          "themes": { "type": "array", "items": { "enum": ["light", "dark"] } },
+          "status": { "enum": ["clean", "findings", "unreachable"] },
+          "unreachable_reason": { "type": "string" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "unreachable" } } },
+            "then": { "required": ["unreachable_reason"] }
+          }
+        ]
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "rule", "severity", "flows", "evidence", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^UD-[0-9]{3}$" },
+          "kind": {
+            "enum": ["defect", "drift"],
+            "description": "defect: wrong on its own evidence. drift: deviates from DESIGN.md or the dominant pattern."
+          },
+          "rule": {
+            "type": "string",
+            "description": "The class from INSPECTION.md, e.g. 'misalignment', 'contrast', 'spacing-scale', 'component-divergence'."
+          },
+          "severity": { "enum": ["high", "medium", "low"] },
+          "flows": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" },
+            "description": "Every flow this one root cause affects. Six flows sharing a cause is one finding, not six."
+          },
+          "evidence": {
+            "type": "object",
+            "required": ["screenshot", "selector", "measured", "expected"],
+            "additionalProperties": false,
+            "properties": {
+              "screenshot": { "type": "string", "description": "Path under shots/." },
+              "selector": { "type": "string" },
+              "measured": { "type": "string", "description": "The value read from the page, e.g. 'padding-top: 10px'." },
+              "expected": { "type": "string", "description": "What the authority requires, e.g. 'on scale 4/8/12/16/24'." },
+              "authority": { "enum": ["design-md", "dominant-pattern", "self-evident"] }
+            }
+          },
+          "probe": {
+            "type": "object",
+            "required": ["path", "test_name", "was_red"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "description": "e2e/ui-drift/<id>.spec.ts" },
+              "test_name": { "type": "string" },
+              "was_red": {
+                "const": true,
+                "description": "Observed failing against the unfixed page. A probe that was never red proves nothing."
+              }
+            }
+          },
+          "proposed_fix": { "type": "string" },
+          "files": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["open", "fixed", "reverted", "deferred"] },
+          "status_reason": { "type": "string" },
+          "deferred_reason": {
+            "enum": ["eye-only", "needs-decision", "redesign-required"],
+            "description": "eye-only: unprobeable. needs-decision: no dominant pattern to appeal to. redesign-required: out of scope."
+          },
+          "commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+          "introduced_by": {
+            "type": "string",
+            "pattern": "^UD-[0-9]{3}$",
+            "description": "Set when a fix for another finding created this one."
+          }
+        },
+        "allOf": [
+          {
+            "$comment": "A fix is only fixed if a probe that was red went green and shipped in a commit.",
+            "if": { "properties": { "status": { "const": "fixed" } } },
+            "then": { "required": ["probe", "commit", "files"] }
+          },
+          {
+            "if": { "properties": { "status": { "const": "reverted" } } },
+            "then": { "required": ["status_reason"] }
+          },
+          {
+            "if": { "properties": { "status": { "const": "deferred" } } },
+            "then": { "required": ["deferred_reason", "status_reason"] }
+          },
+          {
+            "$comment": "Everything except an eye-only finding must be measurable, and therefore probeable.",
+            "if": {
+              "properties": { "deferred_reason": { "const": "eye-only" } },
+              "required": ["deferred_reason"]
+            },
+            "then": true,
+            "else": { "required": ["probe"] }
+          }
+        ]
+      }
+    }
+  }
+}
