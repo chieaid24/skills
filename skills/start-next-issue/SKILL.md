@@ -195,8 +195,10 @@ Only reached once the PR is confirmed `MERGED` (step 5) and any drained PRD clos
 **Orchestrator:**
 - **Iteration `3/3` merged** -> stop. Report every issue/PR merged across the run, then exit. Do not grab another.
 - **Iterations remain** -> dispatch iteration `<n+1>/3` to a **worker with a fresh context window** and wait for it to finish:
-  - **Claude Code:** the Agent tool with a non-fork type (e.g. `general-purpose`) -- a fork inherits this conversation; workers must not. The tool call blocks until the worker ends, and the worker's final message (with its `RESULT:` line) comes back as the tool result.
-  - **Codex CLI / no built-in spawn:** run a non-interactive session (`codex exec`, `claude -p`) in the foreground and capture its output. Do **not** end your own session -- you are the orchestrator and you outlive every worker.
+  - **Claude Code:** the Agent tool with a non-fork type (e.g. `general-purpose`) -- a fork inherits this conversation; workers must not. Do **not** pass a `model` override, and pick a type whose definition pins no model (`general-purpose` doesn't): the worker then inherits this session's model. The tool call blocks until the worker ends, and the worker's final message (with its `RESULT:` line) comes back as the tool result.
+  - **Codex CLI / no built-in spawn:** run a non-interactive session (`codex exec`, `claude -p`) in the foreground and capture its output. Pass your own model explicitly (`codex exec -m <model>`, `claude -p --model <model-id>`) -- a bare invocation uses the CLI's configured default, which may differ from the model running this run. Do **not** end your own session -- you are the orchestrator and you outlive every worker.
+
+  **Workers always run the orchestrator's model** -- inherited on the Agent-tool path, pinned by flag on the CLI path. Never let a worker silently drop to a different model.
 
   Give the worker **only**: the instruction to run `/start-next-issue --worker <n+1>/3 --chain <chain_id>`, plus `<owner>/<repo>` and `<default-branch>`, and the requirement that the last line of its final message be a `RESULT:` line. Pass **your own** `chain_id` -- the run is one owner across all its iterations, so a worker can resume a lane a dead predecessor left mid-flight. The worker rediscovers queue state from `gh`; pass it no other context.
 
