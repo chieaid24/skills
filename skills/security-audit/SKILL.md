@@ -20,49 +20,36 @@ Use the platform's equivalent capabilities while preserving the specified roles,
 
 ## Setup
 
-This skill audits a **git worktree** — a disposable checkout pinned to a single commit — so every run examines a clean, reproducible snapshot without touching your working tree, uncommitted changes, or current branch. Create one per run.
+This skill audits a **git worktree** — a disposable checkout pinned to a single commit — so every run examines a clean, reproducible snapshot without touching your working tree, uncommitted changes, or current branch.
 
-Before starting, establish the audit worktree, then the two paths.
+**GitHub is the store.** This skill does not keep a local run history. The persistent record of findings is the set of GitHub issues and advisories the run files (see [Filing findings to a tracker](#filing-findings-to-a-tracker-optional)); everything written to disk during the run is transient and deleted at cleanup. Each run performs a **full scan** of the whole codebase — it does not read a prior run's output to decide what to look at.
 
-### Create the audit worktree
+Before starting, establish the worktree and a scratch directory. Both are ephemeral.
 
-Run `ls ~/security-audit-skill/<repo-name>/` first to find `<N>`, the next unused run integer. Use the same `<N>` for both the worktree and the output directory. Then, from inside the target repository:
-
-1. **Pick the ref.** Default to the tip of the default branch: `git fetch`, then use `origin/main` (or `main`/`master`/`origin/HEAD` as the repo uses). If the user named a branch, tag, or commit, audit that instead.
-2. **Add the worktree** under the repo's own `.worktrees/` directory (never `.claude/worktrees`):
+1. **Create the worktree.** From inside the target repository, pick the ref to audit — default to the tip of the default branch (`git fetch`, then `origin/main`, or `main`/`master`/`origin/HEAD` as the repo uses); use a user-named branch, tag, or commit if given. Then add it under the repo's own `.worktrees/` directory (never `.claude/worktrees`):
    ```
-   git worktree add .worktrees/security-audit-run-<N> <ref>
+   git worktree add .worktrees/security-audit <ref>
    ```
-3. **Record the commit.** `git -C .worktrees/security-audit-run-<N> rev-parse HEAD` — pin the run to this SHA so periodic runs can be compared commit-to-commit. Record it in `architecture.md`.
-
-If the target is not a git repository, audit it in place and note that the isolation and reproducibility guarantees do not hold.
+   If the target is not a git repository, audit it in place and note that the isolation and reproducibility guarantees do not hold.
+2. **Create a scratch directory** for transient artifacts, e.g. `mktemp -d`. Nothing here survives the run.
 
 ### Paths
 
-- **Target**: the worktree checkout (`.worktrees/security-audit-run-<N>`). Every Phase 1 and Phase 2 agent reads code from here, not from the live working tree.
-- **Output directory**: where all audit artifacts go. It lives **outside** the worktree so it survives cleanup and accumulates run history across weeks. Default to `~/security-audit-skill/<repo-name>/run-<N>` (ask the user if they want a different location). Create it if it does not exist, and use the same `<N>` as the worktree. **Never write artifacts inside the worktree** — they would be destroyed at cleanup and could be committed by accident. Because reports contain live vulnerability detail, the output directory must never be committed into the repo.
+- **Target**: the worktree checkout (`.worktrees/security-audit`). Every Phase 1 and Phase 2 agent reads code from here, not from the live working tree.
+- **Scratch directory**: where the transient audit artifacts go. Never write them inside the worktree (they would dirty the checkout) and never commit them anywhere (they carry live vulnerability detail).
 
-All files written during the audit go in the output directory:
+Transient files written to the scratch directory during the run:
 - `architecture.md` — Phase 1 output, fed into Phase 2 agent prompts
-- `REPORT.md` — human-readable report (Phase 4)
-- `FINDINGS-DETAIL.md` — detailed data flows for MEDIUM+ findings (Phase 4)
-- `findings.json` — machine-readable structured output (Phase 5)
+- `findings.json` — machine-readable structured output (Phase 5); the input the tracker bridge reads to file issues and advisories
+- `REPORT.md` / `FINDINGS-DETAIL.md` — optional human-readable report (Phase 4). Since the issues and advisories are the durable record, produce these only if you want a one-off summary for the current run; they are deleted at cleanup like everything else.
 
-Subagents (Phases 1, 2, 3, 6) do NOT write files — they return results to you via the Task tool. You are responsible for writing all files to the output directory.
+Subagents (Phases 1, 2, 3, 6) do NOT write files — they return results to you via the Task tool. You are responsible for writing the transient files to the scratch directory.
 
-### Coverage and prior runs
+### Coverage
 
-Each audit run explores different code paths depending on which agents find what and where they dig. No single run finds everything. Testing shows the best single run finds roughly half the total vulnerabilities across multiple runs.
+Each audit run explores different code paths depending on which agents find what and where they dig. No single run finds everything. Testing shows the best single run finds roughly half the total vulnerabilities across multiple runs, so running periodically (e.g. weekly) and on a fresh checkout each time is expected.
 
-**If prior runs exist** for the same repo (check `~/security-audit-skill/<repo-name>/`), read their `findings.json` files before starting Phase 2. Use them to:
-1. **Skip known findings** — don't waste agents re-discovering the same status bypass. Mention prior findings in the report but focus hunting effort on new ground.
-2. **Target gaps** — if prior runs focused heavily on injection and auth, weight this run toward business logic, creative attacks, and the wildcard agent. If prior runs missed public endpoints, focus there.
-3. **Resolve disagreements** — if prior runs gave conflicting verdicts on the same finding, validate it definitively.
-4. **Diff since the last run** — this skill is meant to run on a schedule (e.g. weekly), so compare the ref you are auditing against the previous run's recorded SHA: `git -C .worktrees/security-audit-run-<N> log --oneline <prev-sha>..HEAD`. Weight extra hunting effort toward code that changed since the last audit. In Phase 4, tag each finding's status relative to the previous run — **new**, **still open** (reported before, still present), or **regressed** (previously fixed, now back) — and list prior findings that are now fixed as **resolved**. This week-over-week delta is the main value of running periodically.
-
-Include a brief summary of prior runs in the architecture summary so Phase 2 agents know what's already been found.
-
-**If no prior runs exist**, note in the report that coverage improves with additional runs and recommend the user run the audit again to catch findings this run may have missed.
+Because GitHub is the store, the only prior state consulted is at **filing time**: the tracker bridge skips any finding already tracked by an open issue (or an existing advisory), so repeated runs do not create duplicate issues. It does not reopen closed issues or auto-close fixed ones — on a small repo, triage those by hand. The hunt itself always runs full; it does not try to skip ground a previous run covered.
 
 ## Core Principles
 
@@ -111,36 +98,37 @@ Follow all six phases in order:
 5. **Structured output** — Use Phase 5 in [VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md), `report-schema.json`, and `validate-findings.cjs` to write and validate `findings.json`.
 6. **Independent verification** — Use Phase 6 in [VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md) to verify every factual claim and reconcile all outputs.
 
-## Cleanup
-
-Once Phase 6 is complete and all artifacts are written to the output directory, remove the worktree — nothing of value lives inside it:
-
-```
-git worktree remove .worktrees/security-audit-run-<N>
-```
-
-If `git` refuses because of leftover files, artifacts were written to the wrong place — they belong in the output directory, not the worktree. Move them out, then remove. Keep the output directory: it is the run history that powers the prior-run comparison above. To revisit a past run, re-create the worktree at that run's recorded SHA.
-
 ## Filing findings to a tracker (optional)
 
-`findings.json` can be turned into tracker items for an autonomous fix queue with `file-findings.cjs` (in this skill's directory). It routes each confirmed finding by `overall_severity`:
+`findings.json` (in the scratch directory) is turned into tracker items for an autonomous fix queue with `file-findings.cjs` (in this skill's directory), **before cleanup deletes the scratch directory**. It routes each confirmed finding by `overall_severity`:
 
 - **informational / low / medium** → a **public issue** labelled `ready` + `afk`, so an autonomous worker (e.g. the `start-next-issue` flow) can pick it up. The issue body is deliberately neutral — intended behavior, fix strategy, and affected file names only. It carries **no** description, trace lines, preconditions, exploitation steps, payloads, or severity words.
 - **high / critical** → a **private GitHub Security Advisory** with the complete finding. **No public issue is filed.**
 
 Why the split: on a public repo the fix diff itself discloses the vulnerability, so a HIGH/CRITICAL must go through coordinated disclosure (advisory + fix published together), never a public issue that broadcasts an unpatched hole. LOW/MEDIUM disclosure is the accepted tradeoff of tracking the work at all. The severity gate is the whole safety mechanism — do not widen the public bucket for a public repo.
 
-The tool is **idempotent**: each artifact embeds a fingerprint marker derived from the trace's file+function locations (line-independent, so it survives code drift) plus the title. Re-running on a later audit skips findings already filed. This makes it safe on the weekly cadence.
+The tool is **idempotent** and this is what makes GitHub the store: each artifact embeds a fingerprint marker derived from the trace's file+function locations (line-independent, so it survives code drift) plus the title. Before filing, it reads the repo's **open** issues and existing advisories and skips any finding already tracked there, so a weekly re-scan does not create duplicates. It does not reopen closed issues or close fixed ones — triage the open queue by hand on a small repo.
 
 ```
 # ALWAYS dry-run first and read the public issue bodies it prints — confirm no exploit detail leaked through free-text fields
-node <skill-dir>/file-findings.cjs <output-dir>/findings.json --repo <owner/name> --assignee <human> --dry-run
+node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human> --dry-run
 
 # then file for real
-node <skill-dir>/file-findings.cjs <output-dir>/findings.json --repo <owner/name> --assignee <human>
+node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human>
 ```
 
 Requires the `gh` CLI authenticated with repo access; filing advisories needs the security-advisories API enabled (default on public repos). The target repo must already have the `ready` and `afk` labels (see the `bootstrap-issues` flow). Run `--help` for all options (`--issue-label`, `--min-confidence`, `--verbatim-titles`).
+
+## Cleanup
+
+Once the findings have been filed to the tracker, tear down everything transient — GitHub now holds the durable record:
+
+```
+git worktree remove .worktrees/security-audit
+rm -rf <scratch-dir>
+```
+
+Nothing persists locally. To re-examine, run the audit again against the same ref.
 
 ## Anti-Patterns to Avoid
 

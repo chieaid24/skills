@@ -16,11 +16,14 @@
  *                                     coordinated disclosure.
  *   verdict "rejected"            -> skipped.
  *
- * Idempotent: every artifact embeds a stable fingerprint marker
- * (<!-- AUDIT-FINDING:<fp> -->) derived from the trace's file+function locations
- * (line-independent, so it survives week-to-week code drift) plus the title.
- * Re-running (e.g. on a weekly audit) skips any finding whose marker already
- * exists in an issue (any state) or an advisory.
+ * Idempotent (this is what makes GitHub the store): every artifact embeds a
+ * stable fingerprint marker (<!-- AUDIT-FINDING:<fp> -->) derived from the
+ * trace's file+function locations (line-independent, so it survives week-to-week
+ * code drift) plus the title. Before filing, it reads the repo's OPEN issues and
+ * existing advisories and skips any finding already tracked there, so a weekly
+ * re-scan never duplicates. A finding whose issue was closed (fixed) is re-filed
+ * if it reappears. It does not reopen or auto-close anything -- triage the open
+ * queue by hand.
  *
  * Requires the `gh` CLI, authenticated, with repo access. Filing advisories needs
  * the security-advisories API enabled on the repo (default on public repos).
@@ -139,13 +142,15 @@ function preflight() {
 	}
 }
 
-// Existing fingerprints already filed, so re-runs don't duplicate.
-function existingIssueFingerprints(repo) {
+// Fingerprints tracked by an OPEN issue, so re-runs don't duplicate. Closed
+// (fixed) issues are intentionally excluded: if the finding reappears it is
+// re-filed rather than silently swallowed.
+function openIssueFingerprints(repo) {
 	const found = new Set();
 	let issues = [];
 	try {
 		issues = ghJSON([
-			"issue", "list", "--repo", repo, "--state", "all",
+			"issue", "list", "--repo", repo, "--state", "open",
 			"--limit", "1000", "--json", "number,body",
 		]) || [];
 	} catch (e) {
@@ -353,7 +358,10 @@ function main() {
 
 	preflight();
 	console.log(`Reading existing markers in ${opts.repo} ...`);
-	const filed = new Set([...existingIssueFingerprints(opts.repo), ...existingAdvisoryFingerprints(opts.repo)]);
+	// Public issues dedup against OPEN issues only; advisories against all states.
+	const openIssues = openIssueFingerprints(opts.repo);
+	const advisories = existingAdvisoryFingerprints(opts.repo);
+	const seen = new Set(); // guard against the same fp appearing twice in one run
 
 	const minRank = CONFIDENCE_RANK[opts.minConfidence];
 	const stats = { issues: 0, advisories: 0, skippedExisting: 0, skippedRejected: 0, skippedConfidence: 0, skippedUnknown: 0, failed: 0 };
@@ -367,21 +375,23 @@ function main() {
 
 		const fp = fingerprint(f);
 		const label = `[${sev || "?"}] ${f.title || "(untitled)"} (${fp})`;
+		const isPublic = PUBLIC_SEVERITY.has(sev);
+		const isPrivate = PRIVATE_SEVERITY.has(sev);
 
-		if (filed.has(fp)) {
-			console.log(`skip (already filed): ${label}`);
+		if (seen.has(fp) || (isPublic && openIssues.has(fp)) || (isPrivate && advisories.has(fp))) {
+			console.log(`skip (already tracked): ${label}`);
 			stats.skippedExisting++;
 			continue;
 		}
 
 		try {
-			if (PUBLIC_SEVERITY.has(sev)) {
+			if (isPublic) {
 				console.log(`public: ${label}`);
 				const title = opts.verbatimTitles ? f.title : neutralTitle(f);
 				const labels = ["ready", "afk", ...opts.issueLabels];
 				createIssue(opts.repo, title, publicIssueBody(f, fp), labels, opts.dryRun);
 				if (!opts.dryRun) stats.issues++;
-			} else if (PRIVATE_SEVERITY.has(sev)) {
+			} else if (isPrivate) {
 				console.log(`private: ${label}`);
 				createAdvisory(opts.repo, f.title || "Security finding", advisoryBody(f, fp, opts.assignee), sev, opts.dryRun);
 				if (!opts.dryRun) stats.advisories++;
@@ -389,7 +399,7 @@ function main() {
 				console.error(`skip (unknown severity ${JSON.stringify(sev)}): ${label}`);
 				stats.skippedUnknown++;
 			}
-			filed.add(fp);
+			seen.add(fp);
 		} catch (e) {
 			console.error(`  FAILED: ${firstLine(e)}`);
 			stats.failed++;
