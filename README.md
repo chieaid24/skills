@@ -17,6 +17,7 @@ keep yourself in the loop.
 | **catch-up** | Daily read-only reviewer: what shipped/in-progress/blocked, which `hitl` issues await you, diagnose stalled lanes, log to `progress/progress.md`. |
 | **improve-codebase-architecture** | Autonomous architecture pass: explore for deepening opportunities (shallow modules -> deep modules), delegate behavior-preserving refactors to subagents, verify after every change that the consumer contract held (unit + integration + E2E stay green), revert what can't be proven. Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). |
 | **security-audit** | Multi-agent security audit of a codebase: reconnaissance, attack-class hunting, validation, and a schema-checked findings report. Targets exploitable issues with real impact. Vendored from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT). |
+| **writing-great-skills** | Reference for writing and editing skills: invocation trade-offs, description triggers, the steps-vs-reference information hierarchy, completion criteria, with a full `GLOSSARY.md` of the vocabulary. Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). |
 
 ## How it works
 
