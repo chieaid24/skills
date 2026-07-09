@@ -121,6 +121,27 @@ git worktree remove .worktrees/security-audit-run-<N>
 
 If `git` refuses because of leftover files, artifacts were written to the wrong place — they belong in the output directory, not the worktree. Move them out, then remove. Keep the output directory: it is the run history that powers the prior-run comparison above. To revisit a past run, re-create the worktree at that run's recorded SHA.
 
+## Filing findings to a tracker (optional)
+
+`findings.json` can be turned into tracker items for an autonomous fix queue with `file-findings.cjs` (in this skill's directory). It routes each confirmed finding by `overall_severity`:
+
+- **informational / low / medium** → a **public issue** labelled `ready` + `afk`, so an autonomous worker (e.g. the `start-next-issue` flow) can pick it up. The issue body is deliberately neutral — intended behavior, fix strategy, and affected file names only. It carries **no** description, trace lines, preconditions, exploitation steps, payloads, or severity words.
+- **high / critical** → a **private GitHub Security Advisory** with the complete finding. **No public issue is filed.**
+
+Why the split: on a public repo the fix diff itself discloses the vulnerability, so a HIGH/CRITICAL must go through coordinated disclosure (advisory + fix published together), never a public issue that broadcasts an unpatched hole. LOW/MEDIUM disclosure is the accepted tradeoff of tracking the work at all. The severity gate is the whole safety mechanism — do not widen the public bucket for a public repo.
+
+The tool is **idempotent**: each artifact embeds a fingerprint marker derived from the trace's file+function locations (line-independent, so it survives code drift) plus the title. Re-running on a later audit skips findings already filed. This makes it safe on the weekly cadence.
+
+```
+# ALWAYS dry-run first and read the public issue bodies it prints — confirm no exploit detail leaked through free-text fields
+node <skill-dir>/file-findings.cjs <output-dir>/findings.json --repo <owner/name> --assignee <human> --dry-run
+
+# then file for real
+node <skill-dir>/file-findings.cjs <output-dir>/findings.json --repo <owner/name> --assignee <human>
+```
+
+Requires the `gh` CLI authenticated with repo access; filing advisories needs the security-advisories API enabled (default on public repos). The target repo must already have the `ready` and `afk` labels (see the `bootstrap-issues` flow). Run `--help` for all options (`--issue-label`, `--min-confidence`, `--verbatim-titles`).
+
 ## Anti-Patterns to Avoid
 
 These are the mistakes that make security audits useless:
