@@ -1,11 +1,11 @@
 ---
 name: start-next-issue
-description: Iteration-capped worker for the dependency-aware GitHub queue -- grabs the next ready `afk` issue (skipping `hitl` issues, which need a human), drives it to a merged PR, then hands off to a fresh-context agent for up to 3 iterations total before stopping. Optionally accepts an issue number (/start-next-issue 42) or plain-text description (/start-next-issue "fix auth bug") to target a specific issue on the first iteration. Use when the user wants an agent to work a bounded batch of issues from the queue, "work the next few issues", run a capped agent chain, or invokes /start-next-issue.
+description: Iteration-capped orchestrator for the dependency-aware GitHub queue -- the main agent grabs the next ready `afk` issue (skipping `hitl` issues, which need a human), drives it to a merged PR, then dispatches a fresh-context worker agent per remaining iteration (up to 3 issues total), each reporting back to the orchestrator before the next starts; any failure propagates upward and stops the run. Optionally accepts an issue number (/start-next-issue 42) or plain-text description (/start-next-issue "fix auth bug") to target a specific issue on the first iteration. Use when the user wants an agent to work a bounded batch of issues from the queue, "work the next few issues", run a capped orchestrated batch, or invokes /start-next-issue.
 ---
 
 # Start Next Issue
 
-Bounded worker for the dependency-aware GitHub Issues queue. Grab one ready issue, drive it to a merged PR, then hand off to a **fresh-context agent** for the next -- **up to 3 iterations total**, then stop.
+Bounded orchestrator for the dependency-aware GitHub Issues queue. The **main agent** (the orchestrator -- the session the user invoked) works the first ready issue itself, then dispatches one **fresh-context worker agent** per remaining issue and waits for each to report back before starting the next -- **up to 3 issues total**. Control always returns to the orchestrator between issues, and any failure **propagates upward** and halts the whole run.
 
 Requires **`gh` >= 2.94.0** (older `gh` returns no `blockedBy`; the ready set is silently wrong -- fail loudly). Queue conventions live in the repo's CLAUDE.md "Parallel agent workflow" section; this skill executes them. Capture `<owner>/<repo>` and `<default-branch>` once at the start.
 
@@ -13,13 +13,14 @@ Requires **`gh` >= 2.94.0** (older `gh` returns no `blockedBy`; the ready set is
 
 | Invocation | Behaviour |
 |---|---|
-| `/start-next-issue` | New 3-iteration chain at `1/3` -- normal most-blocking-first selection (steps 1-2) |
-| `/start-next-issue 42` | New chain pinned to issue #42 for iteration `1/3` only -- skip to step 2a |
-| `/start-next-issue "fix auth bug"` | New chain, fuzzy-matched to issue title for iteration `1/3` only -- skip to step 2a |
-| `/start-next-issue --iteration <n>/3 --chain <id>` | **Internal**, set by a prior agent's handoff (step 6). Not user-typed. |
-| `/start-next-issue --reclaim 42` | Human-only. Force-release the claim on #42 (a chain died and its id is lost), then stop. |
+| `/start-next-issue` | New 3-iteration run at `1/3` -- this agent is the **orchestrator**; normal most-blocking-first selection (steps 1-2) |
+| `/start-next-issue 42` | New run pinned to issue #42 for iteration `1/3` only -- skip to step 2a |
+| `/start-next-issue "fix auth bug"` | New run, fuzzy-matched to issue title for iteration `1/3` only -- skip to step 2a |
+| `/start-next-issue --worker <n>/3 --chain <id>` | **Internal**, set by the orchestrator's dispatch (step 6). Work exactly one issue, end with a `RESULT:` line, dispatch nothing. Not user-typed. |
+| `/start-next-issue --iteration <n>/3 --chain <id>` | Human resume of a dead run: adopt the chain's paused lane (step 0), finish it as iteration `<n>/3`, then orchestrate the remaining iterations. |
+| `/start-next-issue --reclaim 42` | Human-only. Force-release the claim on #42 (a run died and its chain id is lost), then stop. |
 
-Any invocation without `--iteration` starts a **fresh 3-iteration budget** at `1/3`. A pin (number or description) applies to iteration `1/3` only -- handed-off agents always use normal selection.
+Any invocation without `--worker`/`--iteration` starts a **fresh 3-iteration budget** at `1/3`, with this agent as the orchestrator for the whole run. A pin (number or description) applies to iteration `1/3` only -- dispatched workers always use normal selection.
 
 `--reclaim` is the sole way to break another chain's claim, and it is **never** something an agent decides for itself. Show the claim's `chain`, `host`, and `claimed_at`, confirm with the human that the lane is truly dead, then release and re-open the issue for the queue:
 
@@ -33,7 +34,7 @@ Leave the stale worktree and branch for the human. Then stop -- do not go on to 
 
 Claims are attributed to a **chain id**, not to the `gh` account: agents share one login, so `@me` names every agent at once and can never answer "is this issue mine?".
 
-Given `--chain <id>` (step 6's handoff), use it verbatim. Otherwise mint one, **once**, before step 0:
+Given `--chain <id>` (a step 6 dispatch, or a human resume), use it verbatim. Otherwise mint one, **once**, before step 0:
 
 ```bash
 echo "chain-$(hostname)-$(date +%s%N)"   # -> e.g. chain-blade-1782604800123456789
@@ -52,7 +53,7 @@ PRs, issue comments, and CI-fix reasoning must be plain full English, not a comp
 ```bash
 rm -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.caveman-active"
 ```
-No-op if absent. Run at the **start of every iteration** -- handed-off agents (step 6) are fresh sessions whose `SessionStart` hook re-creates the flag.
+No-op if absent. Run at the **start of every iteration** -- dispatched workers (step 6) are fresh sessions whose `SessionStart` hook re-creates the flag.
 
 ### 0. Resume check (run first, and after any restart)
 Before grabbing new work, check whether **you** already hold some. **Never use `gh issue list --assignee @me` for this** -- with a shared login it returns every agent's in-progress issue, and adopting one hijacks a live sibling's lane. Ownership is proved by the **claim ref** (step 3), never by the assignee:
@@ -81,7 +82,7 @@ An issue is **ready** iff ALL of: has the `ready` label; has the `afk` label and
 
 The ready set is a **filter, not a claim** -- it narrows candidates cheaply, and step 3's CAS decides. Two agents computing the same ready set at the same instant is expected and harmless.
 
-**`hitl` means a human gates the issue** -- an architectural call, a design review, an external dependency. Never grab one, however unblocked it looks: an unattended chain would stall on someone who is away.
+**`hitl` means a human gates the issue** -- an architectural call, a design review, an external dependency. Never grab one, however unblocked it looks: an unattended run would stall on someone who is away.
 
 Side-effect of this read: report **ready-set width** and any **zombies** (claim ref present + `in-progress` + no open PR). Width below the number of running agents means the DAG is too deep -- re-slice. Leave zombies alone (usually paused lanes -- do not reclaim; step 0 owns the only reclaim rule). Also name any open `hitl` issue whose blockers are all `completed` -- it is **waiting on a human**.
 
@@ -96,7 +97,7 @@ Skip steps 1-2 and resolve the target:
 
 **Validation (both):** issue must be open; free of a claim ref (or holding one whose `chain` is yours -- resume); if any blocker is open, warn and ask whether to proceed or pick another -- never silently skip blockers. A claim ref belonging to **another** chain means an agent is on it right now: say so and pick another, even under an explicit pin. On a valid target, proceed to step 3.
 
-**A pinned `hitl` issue is allowed but never silent.** A pin means the user asked for it right now, so the human the exclusion protects is present. Say it is `hitl` and what input it names, ask whether to proceed, then work it with the user in the loop -- surface each decision it flags instead of choosing alone. Handed-off iterations (step 6) use normal selection, so the chain returns to `afk`-only work.
+**A pinned `hitl` issue is allowed but never silent.** A pin means the user asked for it right now, so the human the exclusion protects is present. Say it is `hitl` and what input it names, ask whether to proceed, then work it with the user in the loop -- surface each decision it flags instead of choosing alone. Dispatched workers (step 6) use normal selection, so the run returns to `afk`-only work.
 
 ### 3. Claim atomically -- push a claim ref, then assign
 
@@ -171,7 +172,7 @@ gh pr checks <pr> --watch
   ```
   Release the claim ref **last**: while it exists the lane is still yours, so a crash mid-cleanup leaves a claim your own step 0 will re-adopt rather than a free-for-all. Then `cd` back to the shared checkout root and remove the worktree -- `git worktree remove .worktrees/<n>-<slug>` (`--force` if it refuses; `git branch -D <n>-<slug>` if the local branch lingers). Go to step 5a.
 - **Reproducible failure** -> pull logs (`gh run view --log-failed`), fix **in the worktree**, push, re-watch. **Max 3 fix attempts.** A failure that passes on a plain re-run is flaky and doesn't count.
-- **Still red after 3** -> comment the failure on the issue (what failed + what you tried), swap labels (`gh issue edit <n> --remove-label in-progress --add-label blocked`), leave it assigned, release the claim (`git push -q origin :refs/claims/issue-<n>`) so a human isn't fighting a dead agent's lock, and **STOP THE CHAIN.** No handoff -- this lane waits for a human. Leave the worktree in place for them to inspect.
+- **Still red after 3** -> comment the failure on the issue (what failed + what you tried), swap labels (`gh issue edit <n> --remove-label in-progress --add-label blocked`), leave it assigned, release the claim (`git push -q origin :refs/claims/issue-<n>`) so a human isn't fighting a dead agent's lock, and **HALT THE RUN.** A worker ends with `RESULT: halted ...` (step 6) so the failure propagates up; the orchestrator -- whether it hit this itself on `1/3` or received `halted` from a worker -- stops without dispatching anything further. This lane waits for a human. Leave the worktree in place for them to inspect.
 
 ### 5a. Close the parent PRD if fully delivered
 Only after a confirmed merge, and only if the closed issue named a parent PRD in its `## Parent` field (call it `#<P>`). Scan for siblings still open:
@@ -186,29 +187,49 @@ gh issue close <P> --reason completed --comment "All child issues delivered; clo
 ```
 Otherwise leave it. **Never close a PRD with an open child.**
 
-### 6. Hand off (fresh context) or stop
+### 6. Report upward (worker) or dispatch the next iteration (orchestrator)
 Only reached once the PR is confirmed `MERGED` (step 5) and any drained PRD closed (step 5a).
 
-- **Iteration `3/3`** -> stop. Report the issues/PRs merged across the chain, then exit. Do not grab another.
-- **Iterations remain** -> launch iteration `<n+1>/3` as a **new agent with a fresh context window** (must not inherit this conversation):
-  - **Claude Code:** the Agent tool with a non-fork type (e.g. `general-purpose`).
-  - **Codex CLI / no built-in spawn:** exec a new non-interactive session (`codex exec`, `claude -p`), then end this session.
+**Worker (`--worker`):** your job ends with this one issue -- never dispatch anything, never loop back to step 1. End your session with a report whose **last line** is exactly one `RESULT:` line (protocol below). The orchestrator reads that line; everything above it is free-form report (drive-by fixes, ready-set width, zombies, waiting `hitl` issues).
 
-  Give the new agent **only**: the instruction to run `/start-next-issue --iteration <n+1>/3 --chain <chain_id>`, plus `<owner>/<repo>` and `<default-branch>`. Pass **your own** `chain_id` -- the chain is one owner across its iterations, so the successor can resume a lane you left mid-flight. Your run ends here -- don't loop back to step 0 yourself; the new agent rediscovers queue state from `gh`.
+**Orchestrator:**
+- **Iteration `3/3` merged** -> stop. Report every issue/PR merged across the run, then exit. Do not grab another.
+- **Iterations remain** -> dispatch iteration `<n+1>/3` to a **worker with a fresh context window** and wait for it to finish:
+  - **Claude Code:** the Agent tool with a non-fork type (e.g. `general-purpose`) -- a fork inherits this conversation; workers must not. The tool call blocks until the worker ends, and the worker's final message (with its `RESULT:` line) comes back as the tool result.
+  - **Codex CLI / no built-in spawn:** run a non-interactive session (`codex exec`, `claude -p`) in the foreground and capture its output. Do **not** end your own session -- you are the orchestrator and you outlive every worker.
+
+  Give the worker **only**: the instruction to run `/start-next-issue --worker <n+1>/3 --chain <chain_id>`, plus `<owner>/<repo>` and `<default-branch>`, and the requirement that the last line of its final message be a `RESULT:` line. Pass **your own** `chain_id` -- the run is one owner across all its iterations, so a worker can resume a lane a dead predecessor left mid-flight. The worker rediscovers queue state from `gh`; pass it no other context.
+
+**Worker report protocol** -- the last line of the worker's final message, exactly one of:
+
+```
+RESULT: merged issue=<n> pr=<url>            # issue delivered; safe to dispatch the next
+RESULT: halted issue=<n> reason=<one line>   # 3-strike CI failure or otherwise dead lane
+RESULT: drained                              # no open issues remain
+RESULT: hitl-only                            # only human-gated issues remain
+```
+
+**Acting on the result -- errors propagate upward, always:**
+- `merged` -> record it, then loop: dispatch `<n+2>/3` or stop after `3/3`.
+- `halted` -> **stop the run now.** Surface the worker's reason, the issue number, and the claim state to the user. Never dispatch past a failure.
+- `drained` / `hitl-only` -> stop and report (list the waiting `hitl` issues if the worker named them).
+- **Anything else** -- no `RESULT:` line, a spawn error, a worker that died mid-issue -- treat it as `halted`: stop, report your `chain_id` and what you observed, and point the human at `--iteration <n>/3 --chain <chain_id>` (resume) or `--reclaim` (break the claim). Never re-dispatch the same iteration -- the dead worker may hold a half-finished claim -- and never dispatch the next one on an ambiguous result.
 
 ## Stopping
 
-- **Iteration `3/3` merged** -> chain complete, stop.
-- **Ready set empty but open `afk` issues remain** (all blocked or claimed) -> **poll with backoff** within the current iteration: re-read ~every 60s, resume when one becomes ready. Doesn't consume an iteration or trigger a handoff.
-- **Ready set empty and every open issue is `hitl`** -> **exit, don't poll.** Only a human can make one ready. List them and stop.
-- **No open issues remain** -> queue drained -> exit and say so, regardless of iteration count.
-- **3-strike CI failure** -> halt the whole chain (step 5). No handoff.
-- **Usage limits kill the session mid-issue** -> a paused claim is left (its issue is `in-progress`, so it is out of the ready set and siblings ignore it). Re-invoke `/start-next-issue --iteration <n>/3 --chain <chain_id>` when limits reset -- step 0 matches the claim ref and resumes it. **The chain id is what makes the lane recoverable**, which is why step 0 prints it; lose it and the lane needs a human `--reclaim`. A bare `/start-next-issue` is always safe: it starts a fresh budget and takes new work rather than stealing the paused lane.
+- **Iteration `3/3` merged** -> run complete, stop.
+- **Ready set empty but open `afk` issues remain** (all blocked or claimed) -> **poll with backoff** within the current iteration (whichever agent is executing it): re-read ~every 60s, resume when one becomes ready. Doesn't consume an iteration.
+- **Ready set empty and every open issue is `hitl`** -> **exit, don't poll.** Only a human can make one ready. A worker reports `RESULT: hitl-only` and lists them; the orchestrator stops.
+- **No open issues remain** -> queue drained -> a worker reports `RESULT: drained`; the orchestrator exits and says so, regardless of iteration count.
+- **3-strike CI failure** -> the failing agent halts its iteration (step 5) and the error propagates upward: a worker via `RESULT: halted`, the orchestrator by stopping directly. Nothing further is dispatched.
+- **A worker dies without a `RESULT:` line** -> the orchestrator survives, treats it as `halted`, and stops (step 6). Its claim stays paused for the resume below.
+- **Usage limits kill the orchestrator mid-issue** -> a paused claim is left (its issue is `in-progress`, so it is out of the ready set and siblings ignore it). Re-invoke `/start-next-issue --iteration <n>/3 --chain <chain_id>` when limits reset -- step 0 matches the claim ref and resumes it, then orchestration continues. **The chain id is what makes the lane recoverable**, which is why step 0 prints it; lose it and the lane needs a human `--reclaim`. A bare `/start-next-issue` is always safe: it starts a fresh budget and takes new work rather than stealing the paused lane.
 
 ## Notes
 - **Crash-safe by construction:** the claim refs on `origin` ARE the resume state -- no checkpoint file. A kill leaves at most one claimed issue, recovered by step 0.
 - **The claim ref is the only ownership record.** `@me` cannot answer "is this mine?" under a shared login, a label cannot be set atomically, and a filesystem lock does not span clones or hosts. Anything that reasons about ownership must read `refs/claims/issue-<n>`.
-- **Iteration count is chain state, not repo state:** it lives only in the `--iteration` handoff arg. If a chain dies before handoff, the count is lost -- re-invoking bare just starts a new budget, harmless.
+- **Iteration count is orchestrator state, not repo state:** it lives in the orchestrator's own loop and the `--worker <n>/3` arg it passes down. If the orchestrator dies, the count dies with it -- re-invoke with `--iteration` to resume the old budget, or bare to start a new one, harmless.
+- **Errors travel up, never sideways.** A worker never decides the run continues: it works one issue, reports, and ends. Only the orchestrator dispatches, and it stops at the first non-`merged` result.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, fine -- it rebases at its own merge gate.
 - **One issue per worktree/branch/PR -- never batch.** The one exception is a drive-by out-of-scope fix (step 4a) riding along under `## Out-of-scope fixes`; you still never deliberately pull another queue issue's slice in.
 - **`hitl` is a hard skip, never a judgement call.** The label is the whole test -- don't reason from the body that one "looks autonomous enough", and never relabel it `afk` to unblock yourself. Only a human moves an issue between the two. Sole exception: an explicit pin (step 2a).
