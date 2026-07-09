@@ -15,20 +15,20 @@ keep yourself in the loop.
 | **spec** | Grill a rough idea -> sharpen domain language + write ADRs -> route by scope: publish a `[PRD]` issue with child slices for large features, or create one or a few dependency-linked issues directly for small changes. Reconciles the open graph, quizzes before publishing, labels each issue `afk` or `hitl`. |
 | **start-next-issue** | Iteration-capped worker: grab the most-blocking ready `afk` issue -> work it -> babysit CI -> merge -> hand off to a fresh-context agent for the next, up to 3 total. Never touches `hitl`. |
 | **catch-up** | Daily read-only reviewer: what shipped/in-progress/blocked, which `hitl` issues await you, diagnose stalled lanes, log to `progress/progress.md`. |
-| **improve-codebase-architecture** | Scan the codebase for deepening opportunities (shallow modules -> deep modules), present them as a visual HTML report, then grill through the one you pick. Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). |
+| **improve-codebase-architecture** | Autonomous architecture pass: explore for deepening opportunities (shallow modules -> deep modules), delegate behavior-preserving refactors to subagents, verify after every change that the consumer contract held (unit + integration + E2E stay green), revert what can't be proven. Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). |
 | **security-audit** | Multi-agent security audit of a codebase: reconnaissance, attack-class hunting, validation, and a schema-checked findings report. Targets exploitable issues with real impact. Vendored from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT). |
 
 ## How it works
 
 - Edges are true logical dependencies only (native GitHub `blocked-by`); file contention rides the merge gate via rebase.
-- Ready = labelled `ready`, labelled `afk`, unassigned, every blocker closed as `completed`.
+- Ready = labelled `ready`, labelled `afk`, unassigned, unclaimed, every blocker closed as `completed`.
 - Autonomy is a label, not prose: `afk` runs unattended, `hitl` waits for you. The worker skips `hitl` so an overnight chain never stalls against an absent human; `/catch-up` lists them so they don't rot.
-- Claim = assignment (atomic). Select = most-blocking-first.
+- Claim = a compare-and-swap push of `refs/claims/issue-<n>`, arbitrated by GitHub, so exactly one agent wins across clones and hosts. Assignment and labels only *report* the claim -- neither can be set atomically. Select = most-blocking-first.
 - CI babysit: 3 fix attempts, then comment + `blocked` + stop the lane.
 
 ## Requirements
 
-- Node.js, npm, Git, `gh` >= 2.94.0.
+- Node.js, npm, `gh` >= 2.94.0, `git` >= 2.13 (the issue-queue claim lock needs `--force-with-lease` with an empty expect).
 - A GitHub repository with an `origin` remote.
 - A GitHub token scoped to the skill in use (`bootstrap-issues` needs Contents, Issues, Pull requests, Administration).
 

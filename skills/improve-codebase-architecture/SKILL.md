@@ -1,65 +1,114 @@
 ---
 name: improve-codebase-architecture
-description: Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.
+description: Autonomous architecture-improvement pass. Explore the codebase for deepening opportunities (shallow modules to deep modules), delegate behavior-preserving refactors to subagents, and continuously verify that nothing changed from the consumer side by keeping unit, integration, and E2E suites green. Use for unattended architecture cleanup, "improve the architecture", or agent-driven refactoring runs.
 ---
 
 # Improve Codebase Architecture
 
-Surface architectural friction and propose **deepening opportunities** — refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
+You are running unattended. Your job: surface architectural friction, execute **deepening
+refactors** (turn shallow modules into deep ones) through implementation subagents, and prove at
+every step that observable behavior is unchanged. The aim is testability and AI-navigability.
+No human is available to pick candidates or approve changes; the test suites are your approval
+mechanism.
 
-This command is _informed_ by the project's domain model and built on a shared design vocabulary:
+## Vocabulary
 
-- Run the `/codebase-design` skill for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion — don't drift into "component," "service," "API," or "boundary."
-- The domain language in `CONTEXT.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.
+Use these terms exactly; do not drift into "component", "service", or "boundary".
+
+- **Module** — any unit with an inside and an outside: a function, class, file, or package.
+- **Interface** — everything a caller must know to use a module correctly, including hidden
+  contracts like call order or shared state.
+- **Depth** — the ratio of implementation hidden to interface exposed. A **deep** module hides a
+  large implementation behind a small interface. A **shallow** module's interface is nearly as
+  complex as what it hides.
+- **Seam** — a place where the codebase can be split so the two sides only communicate through a
+  narrow interface.
+- **Adapter** — a thin translation layer at a seam. One adapter means a hypothetical seam; two
+  adapters mean a real one.
+- **Leverage** — how much behavior a single change or test exercises. Deep modules give tests
+  leverage.
+- **Locality** — whether the code that changes together lives together. Pure functions extracted
+  solely for testability destroy locality: the real bugs hide in how they are called.
+- **Deletion test** — ask of any suspect module: would deleting it and inlining its work
+  concentrate complexity behind a real interface, or just relocate it? "Concentrates" marks a
+  deepening opportunity.
+- **The interface is the test surface** — tests should exercise a module through its interface;
+  if a module is hard to test that way, the interface is wrong.
+
+## Hard rules
+
+- **The consumer contract is frozen.** Nothing observable from outside the codebase may change:
+  exported/public API of a published library, HTTP/RPC routes and payload shapes, CLI flags and
+  output, UI behavior, persisted data formats, emitted events, error types and messages that
+  callers match on. Internal structure may change freely — that is the point.
+- **Never work on a red baseline.** If the suite fails before you touch anything, stop and
+  report; you cannot prove behavior preservation without a green starting point.
+- **Never leave the tree red.** A candidate that cannot be made green is reverted, not parked.
+- **Verify after every candidate, never in batches.** A batch that fails cannot be attributed.
 
 ## Process
 
-### 1. Explore
+### 1. Baseline
 
-Read the project's domain glossary (`CONTEXT.md`) and any ADRs in the area you're touching first.
+Discover how this repo verifies itself: read `AGENTS.md`/`CLAUDE.md`/`README.md`, package
+manifests, and CI workflow files. Identify the commands for unit tests, integration tests, E2E
+tests, typecheck, lint, and build. Run all of them and record the results. If anything fails,
+stop and report the failures instead of refactoring.
 
-Then use the Agent tool with `subagent_type=Explore` to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
+### 2. Explore
+
+If the repo has a domain glossary (`CONTEXT.md`) or ADRs (`docs/adr/`), read them first. Name
+modules in the domain's language, and treat ADRs as settled: discard any candidate that
+contradicts one.
+
+Delegate one or more read-only exploration subagents to walk the codebase. No rigid heuristics —
+explore organically and note friction:
 
 - Where does understanding one concept require bouncing between many small modules?
-- Where are modules **shallow** — interface nearly as complex as the implementation?
-- Where have pure functions been extracted just for testability, but the real bugs hide in how they're called (no **locality**)?
+- Where are modules shallow — interface nearly as complex as the implementation?
+- Where have pure functions been extracted just for testability, but the real bugs hide in how
+  they are called (no locality)?
 - Where do tightly-coupled modules leak across their seams?
 - Which parts of the codebase are untested, or hard to test through their current interface?
 
-Apply the **deletion test** to anything you suspect is shallow: would deleting it concentrate complexity, or just move it? A "yes, concentrates" is the signal you want.
+Apply the deletion test to anything suspected shallow.
 
-### 2. Present candidates as an HTML report
+### 3. Select and plan
 
-Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Open it for the user — `xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows — and tell them the absolute path.
+For each candidate record: the files involved, the problem (why the current shape causes
+friction), the solution (what deepens), the benefit in terms of locality, leverage, and test
+surface, and a strength rating of `Strong`, `Worth exploring`, or `Speculative`.
 
-The report uses **Tailwind via CDN** for layout and styling, and **Mermaid via CDN** for diagrams where a graph/flow/sequence reliably communicates the structure. Mix Mermaid with hand-crafted CSS/SVG visuals — use Mermaid when relationships are graph-shaped (call graphs, dependencies, sequences), and hand-built divs/SVG when you want something more editorial (mass diagrams, cross-sections, collapse animations). Each candidate gets a **before/after visualisation**. Be visual.
+Execute only `Strong` candidates; list the rest in the final report for a future run. Order them
+so earlier refactors do not invalidate later ones. Run candidates sequentially unless their file
+sets are fully disjoint, in which case implementation subagents may run in parallel.
 
-For each candidate, render a card with:
+If a candidate's area is not covered by tests through its consumer-visible surface, first write
+characterization tests that pin current behavior — inputs, outputs, errors, side effects. They
+must pass before the refactor and unchanged after it. If current behavior cannot be pinned this
+way, skip the candidate.
 
-- **Files** — which files/modules are involved
-- **Problem** — why the current architecture is causing friction
-- **Solution** — plain English description of what would change
-- **Benefits** — explained in terms of locality and leverage, and how tests would improve
-- **Before / After diagram** — side-by-side, custom-drawn, illustrating the shallowness and the deepening
-- **Recommendation strength** — one of `Strong`, `Worth exploring`, `Speculative`, rendered as a badge
+### 4. Delegate implementation
 
-End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
+Send one implementation subagent per candidate with a scoped brief: the exact files it may touch,
+the target interface shape, the tests that must stay green, and the consumer contract items it
+must not alter. The subagent changes nothing outside its file set and rewrites tests only where
+the refactor moved an internal interface — never to make a failing assertion pass by weakening it.
 
-**Use CONTEXT.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
+### 5. Verify
 
-**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
+After each candidate, before starting the next:
 
-See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
+1. Run the tests nearest the touched area, then the full unit suite, then integration and E2E.
+2. Check the consumer contract directly where tools exist: diff public type declarations or
+   exported symbols, compare API schemas or snapshots, diff CLI help/output.
+3. On failure, give the implementing subagent up to two fix attempts. Still red: revert the
+   candidate completely, re-run the suite to confirm the revert restored green, and log why.
+4. On green, commit the candidate on its own (conventional `refactor(scope): ...`), so every
+   refactor is independently revertable.
 
-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
+### 6. Report
 
-### 3. Grilling loop
-
-Once the user picks a candidate, run the `/grilling` skill to walk the design tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
-
-Side effects happen inline as decisions crystallize — run the `/domain-modeling` skill to keep the domain model current as you go:
-
-- **Naming a deepened module after a concept not in `CONTEXT.md`?** Add the term to `CONTEXT.md`. Create the file lazily if it doesn't exist.
-- **Sharpening a fuzzy term during the conversation?** Update `CONTEXT.md` right there.
-- **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing — skip ephemeral reasons ("not worth it right now") and self-evident ones.
-- **Want to explore alternative interfaces for the deepened module?** Run the `/codebase-design` skill and use its design-it-twice parallel sub-agent pattern.
+End with a summary: refactors executed with their verification evidence (suites run, pass
+counts, contract checks), candidates reverted or skipped and why, and remaining opportunities
+(`Worth exploring` / `Speculative`) for a future run.
