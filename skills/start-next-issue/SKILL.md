@@ -16,9 +16,30 @@ Requires **`gh` >= 2.94.0** (older `gh` returns no `blockedBy`; the ready set is
 | `/start-next-issue` | New 3-iteration chain at `1/3` -- normal most-blocking-first selection (steps 1-2) |
 | `/start-next-issue 42` | New chain pinned to issue #42 for iteration `1/3` only -- skip to step 2a |
 | `/start-next-issue "fix auth bug"` | New chain, fuzzy-matched to issue title for iteration `1/3` only -- skip to step 2a |
-| `/start-next-issue --iteration <n>/3` | **Internal**, set by a prior agent's handoff (step 6). Not user-typed. |
+| `/start-next-issue --iteration <n>/3 --chain <id>` | **Internal**, set by a prior agent's handoff (step 6). Not user-typed. |
+| `/start-next-issue --reclaim 42` | Human-only. Force-release the claim on #42 (a chain died and its id is lost), then stop. |
 
 Any invocation without `--iteration` starts a **fresh 3-iteration budget** at `1/3`. A pin (number or description) applies to iteration `1/3` only -- handed-off agents always use normal selection.
+
+`--reclaim` is the sole way to break another chain's claim, and it is **never** something an agent decides for itself. Show the claim's `chain`, `host`, and `claimed_at`, confirm with the human that the lane is truly dead, then release and re-open the issue for the queue:
+
+```bash
+git push -q origin :refs/claims/issue-42
+gh issue edit 42 --remove-assignee @me --remove-label in-progress --add-label ready
+```
+Leave the stale worktree and branch for the human. Then stop -- do not go on to grab work.
+
+## Chain identity -- who "you" are
+
+Claims are attributed to a **chain id**, not to the `gh` account: agents share one login, so `@me` names every agent at once and can never answer "is this issue mine?".
+
+Given `--chain <id>` (step 6's handoff), use it verbatim. Otherwise mint one, **once**, before step 0:
+
+```bash
+echo "chain-$(hostname)-$(date +%s%N)"   # -> e.g. chain-blade-1782604800123456789
+```
+
+Then **print it to the user and reuse that exact literal** in every later command of this run. Shell variables do not survive between commands -- each runs in its own process -- so re-running the `echo` mints a *different* chain and orphans your own claims. Treat the id as a constant you carry, not an expression you re-evaluate. It is opaque; only equality matters.
 
 ## Worktree isolation -- the one hard rule
 
@@ -34,21 +55,35 @@ rm -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.caveman-active"
 No-op if absent. Run at the **start of every iteration** -- handed-off agents (step 6) are fresh sessions whose `SessionStart` hook re-creates the flag.
 
 ### 0. Resume check (run first, and after any restart)
-Before grabbing new work, check whether **you** already hold some:
+Before grabbing new work, check whether **you** already hold some. **Never use `gh issue list --assignee @me` for this** -- with a shared login it returns every agent's in-progress issue, and adopting one hijacks a live sibling's lane. Ownership is proved by the **claim ref** (step 3), never by the assignee:
+
 ```bash
-gh issue list --state open --assignee @me --json number,title,labels --limit 20
+git fetch -q origin 'refs/claims/*:refs/claims/*' --prune
+for ref in $(git for-each-ref --format='%(refname)' refs/claims/); do
+  n="${ref##*/issue-}"
+  echo "#$n -> $(git show "$ref:claim" | sed -n 's/^chain=//p')"   # the fields live in the blob,
+done                                                               # not the commit message
 ```
-If an issue assigned to you is `in-progress` with an unmerged/missing PR, **resume it** (re-enter steps 4-5) instead of grabbing new -- the usage-limit resume path (see Stopping). Its worktree likely still exists: `git worktree list`, then `cd` back in rather than recreating. Otherwise continue to step 1 (or step 2a for a pinned `1/3`).
+
+Adopt a claim `#<n>` **only** if its `chain` equals your `chain_id`. That is the entire rule.
+
+Every other claim is **another agent's lane**: leave the ref, the labels, the assignee, and the worktree untouched, name it in the report, and continue to step 1. Not yours to take -- however old it looks, and however loudly `@me` insists you are the assignee.
+
+Do **not** try to infer liveness from a recorded pid. Each shell command runs in a fresh, short-lived process, so a pid captured at claim time is already dead moments later; a "reclaim if the pid is gone" rule would have every agent instantly reclaim its own live lane. Age is no better: a healthy lane can sit for an hour on slow CI. **Liveness is not observable here, so the chain id is the only sound answer**, and a genuinely abandoned claim is a human's call (`--reclaim`, below).
+
+On adopting, re-enter steps 4-5. Its worktree likely still exists: `git worktree list`, then `cd` back in rather than recreating. Otherwise continue to step 1 (or step 2a for a pinned `1/3`).
 
 ### 1. Compute the ready set (mechanical -- no LLM)
 ```bash
 gh issue list --state open --json number,title,labels,assignees,blockedBy --limit 100
 ```
-An issue is **ready** iff ALL of: has the `ready` label; has the `afk` label and **not** `hitl`; has **no assignee**; every `blockedBy` issue is closed with `stateReason == completed` (verify with `gh issue view <blocker> --json state,stateReason`).
+An issue is **ready** iff ALL of: has the `ready` label; has the `afk` label and **not** `hitl`; has **no assignee**; has **no claim ref** (`refs/claims/issue-<n>` absent from the step 0 fetch); every `blockedBy` issue is closed with `stateReason == completed` (verify with `gh issue view <blocker> --json state,stateReason`).
+
+The ready set is a **filter, not a claim** -- it narrows candidates cheaply, and step 3's CAS decides. Two agents computing the same ready set at the same instant is expected and harmless.
 
 **`hitl` means a human gates the issue** -- an architectural call, a design review, an external dependency. Never grab one, however unblocked it looks: an unattended chain would stall on someone who is away.
 
-Side-effect of this read: report **ready-set width** and any **zombies** (assigned + `in-progress` + no open PR). Width below the number of running agents means the DAG is too deep -- re-slice. Leave zombies alone (usually paused lanes -- do not reclaim). Also name any open `hitl` issue whose blockers are all `completed` -- it is **waiting on a human**.
+Side-effect of this read: report **ready-set width** and any **zombies** (claim ref present + `in-progress` + no open PR). Width below the number of running agents means the DAG is too deep -- re-slice. Leave zombies alone (usually paused lanes -- do not reclaim; step 0 owns the only reclaim rule). Also name any open `hitl` issue whose blockers are all `completed` -- it is **waiting on a human**.
 
 ### 2. Select -- most-blocking first
 Pick the ready issue that unblocks the **most** downstream issues: for each candidate `C`, count open `X` where `C ∈ X.blockedBy` (invert the data you already fetched). Highest wins; tiebreak lowest issue number.
@@ -59,27 +94,44 @@ Skip steps 1-2 and resolve the target:
 - **Issue number** (`42`): `gh issue view 42 --json number,title,labels,assignees,blockedBy,state`
 - **Description** (`"fix auth bug"`): fetch the open list as in step 1, score each title by similarity (exact substring first, then fuzzy), pick the best. If two tie, list both and ask the user.
 
-**Validation (both):** issue must be open; unassigned (or assigned only to you -- resume); if any blocker is open, warn and ask whether to proceed or pick another -- never silently skip blockers. On a valid target, proceed to step 3.
+**Validation (both):** issue must be open; free of a claim ref (or holding one whose `chain` is yours -- resume); if any blocker is open, warn and ask whether to proceed or pick another -- never silently skip blockers. A claim ref belonging to **another** chain means an agent is on it right now: say so and pick another, even under an explicit pin. On a valid target, proceed to step 3.
 
 **A pinned `hitl` issue is allowed but never silent.** A pin means the user asked for it right now, so the human the exclusion protects is present. Say it is `hitl` and what input it names, ask whether to proceed, then work it with the user in the loop -- surface each decision it flags instead of choosing alone. Handed-off iterations (step 6) use normal selection, so the chain returns to `afk`-only work.
 
-### 3. Claim atomically -- local lock, then assign
-Agents here share **one `gh` login**, so the assignee alone can't distinguish "I claimed it" from "another agent on this account did" -- both read `@me` and both think they won. Gate the claim with an atomic `mkdir` lock in the shared git dir so exactly one agent enters the critical section:
+### 3. Claim atomically -- push a claim ref, then assign
+
+Neither the assignee nor the label can arbitrate a race. Agents share **one `gh` login**, so both claimers read `@me` and both think they won; and `gh issue edit --add-assignee` is *additive* (issues take many assignees) with no conditional/`If-Match` flag, so both calls succeed and neither errors. A local lock can't arbitrate either -- lanes routinely run in separate clones and on separate hosts, where any filesystem lock is a silent no-op.
+
+Let **the git server** arbitrate. Creating a ref that already exists is rejected remotely, so exactly one agent's push survives:
+
 ```bash
-lockdir="$(git rev-parse --git-common-dir)/claim-locks"; mkdir -p "$lockdir"
-if mkdir "$lockdir/<n>" 2>/dev/null; then
-  # won the lock -- re-read GitHub state INSIDE the lock (this closes the check-to-claim gap)
+# 1. Build a UNIQUE claim object. The nonce is load-bearing: two agents pushing the SAME sha
+#    short-circuit to "Everything up-to-date" and BOTH exit 0 -- a double claim with no error.
+#    `host` and `claimed_at` are diagnostics for a human; nothing automated may reason from them.
+blob=$(printf 'issue=%s\nchain=%s\nhost=%s\nclaimed_at=%s\n' \
+         "<n>" "$chain_id" "$(hostname)" "$(date -u +%FT%TZ)" | git hash-object -w --stdin)
+tree=$(printf '100644 blob %s\tclaim\n' "$blob" | git mktree)
+obj=$(git commit-tree "$tree" -m "claim <n> by $chain_id")   # parentless: never a fast-forward of another claim
+
+# 2. Compare-and-swap. Empty expect (the trailing `:`) means "this ref must not already exist".
+#    Enforced by the server, not the client -- a clone that never fetched the ref still loses.
+if git push -q --force-with-lease=refs/claims/issue-<n>: origin "$obj":refs/claims/issue-<n> 2>/dev/null; then
+  # WON. Re-read GitHub state now that the claim is held (closes the check-to-claim gap):
   gh issue view <n> --json assignees,labels,state
-  # proceed only if still open, unassigned (or only you), still labelled `ready`:
+  # Still open, unassigned, still labelled `ready`? Then record the claim where humans can see it:
   gh issue edit <n> --add-assignee @me
   gh issue edit <n> --remove-label ready --add-label in-progress
-  rmdir "$lockdir/<n>"   # release -- the in-progress label now gates other agents
+  # Not still ready (someone closed or relabelled it)? Release and re-select:
+  #   git push -q origin :refs/claims/issue-<n>   -- then return to step 1
 else
-  # lock held. If the issue is NOT actually assigned + in-progress, it's a stale lock from a crashed
-  # agent: rmdir "$lockdir/<n>" and retry once. Otherwise you lost the race -- return to step 2.
+  # LOST -- another agent holds the claim. NEVER delete a claim ref you do not own; that is
+  # what broke the old lock. Return to STEP 1 (not step 2): your ready set is now stale.
 fi
 ```
-Hold the lock only across assign + label swap (a second or two). The durable cross-agent claim is the `in-progress` label + assignee, not the lock. Don't open a worktree until you hold a confirmed clean claim.
+
+The claim ref is the **durable, cross-host claim** and the sole ownership record -- the `in-progress` label and assignee are human-visible *reporting*, downstream of it. Hold the ref for the whole lane and delete it at merge (step 5). Don't open a worktree until the CAS push has succeeded.
+
+**Stale claim refs** (crashed agent whose chain id is lost) are reaped only by a human, via `--reclaim`. No agent may decide on its own that another chain's claim has gone stale.
 
 ### 4. Work it -- in a dedicated worktree
 One issue -> one worktree -> one branch. Cut the branch from **fresh** `<default-branch>` (does not touch the shared checkout):
@@ -87,7 +139,7 @@ One issue -> one worktree -> one branch. Cut the branch from **fresh** `<default
 git fetch origin
 git worktree add -b <n>-<slug> .worktrees/<n>-<slug> origin/<default-branch>
 ```
-If it already exists (resume, step 0), reuse it -- `git worktree list` for the path. Then `cd .worktrees/<n>-<slug>` and stay there. Implement the slice to its acceptance criteria, commit, and open the PR with `Closes #<n>`:
+If the worktree already exists (resume, step 0), reuse it -- `git worktree list` for the path. If the *branch* exists but its worktree is gone (a crashed lane you just adopted), `git worktree add` fails with `branch already exists`; re-attach instead of forcing a new branch: `git worktree add .worktrees/<n>-<slug> <n>-<slug>`. Then `cd .worktrees/<n>-<slug>` and stay there. Implement the slice to its acceptance criteria, commit, and open the PR with `Closes #<n>`:
 ```bash
 gh pr create --head <n>-<slug> --title "<title>" --body "Closes #<n>"
 ```
@@ -108,16 +160,17 @@ gh pr checks <pr> --watch
 ```
 - **Green** -> merge now (don't leave it open):
   ```bash
-  gh pr merge <pr> --merge --delete-branch          # merge commit, not squash -- keep every commit
+  gh pr merge <pr> --squash --delete-branch         # one commit per issue; CI fixes + drive-bys collapse
   gh pr view <pr> --json state --jq .state          # must read MERGED
   ```
-  If not `MERGED` (branch out of date, protection rule), resolve and retry -- don't move on with an open PR. The merge's `Closes #<n>` closes the issue, but the label doesn't clear itself -- drop it explicitly:
+  If not `MERGED` (branch out of date, protection rule), resolve and retry -- don't move on with an open PR. The merge's `Closes #<n>` closes the issue, but neither the label nor your claim clears itself -- **release both, in this order**:
   ```bash
   gh issue edit <n> --remove-label in-progress
+  git push -q origin :refs/claims/issue-<n>         # release the claim -- only ever your own
   ```
-  Then `cd` back to the shared checkout root and remove the worktree -- `git worktree remove .worktrees/<n>-<slug>` (`--force` if it refuses; `git branch -D <n>-<slug>` if the local branch lingers). Go to step 5a.
+  Release the claim ref **last**: while it exists the lane is still yours, so a crash mid-cleanup leaves a claim your own step 0 will re-adopt rather than a free-for-all. Then `cd` back to the shared checkout root and remove the worktree -- `git worktree remove .worktrees/<n>-<slug>` (`--force` if it refuses; `git branch -D <n>-<slug>` if the local branch lingers). Go to step 5a.
 - **Reproducible failure** -> pull logs (`gh run view --log-failed`), fix **in the worktree**, push, re-watch. **Max 3 fix attempts.** A failure that passes on a plain re-run is flaky and doesn't count.
-- **Still red after 3** -> comment the failure on the issue (what failed + what you tried), swap labels (`gh issue edit <n> --remove-label in-progress --add-label blocked`), leave it assigned, and **STOP THE CHAIN.** No handoff -- this lane waits for a human.
+- **Still red after 3** -> comment the failure on the issue (what failed + what you tried), swap labels (`gh issue edit <n> --remove-label in-progress --add-label blocked`), leave it assigned, release the claim (`git push -q origin :refs/claims/issue-<n>`) so a human isn't fighting a dead agent's lock, and **STOP THE CHAIN.** No handoff -- this lane waits for a human. Leave the worktree in place for them to inspect.
 
 ### 5a. Close the parent PRD if fully delivered
 Only after a confirmed merge, and only if the closed issue named a parent PRD in its `## Parent` field (call it `#<P>`). Scan for siblings still open:
@@ -140,7 +193,7 @@ Only reached once the PR is confirmed `MERGED` (step 5) and any drained PRD clos
   - **Claude Code:** the Agent tool with a non-fork type (e.g. `general-purpose`).
   - **Codex CLI / no built-in spawn:** exec a new non-interactive session (`codex exec`, `claude -p`), then end this session.
 
-  Give the new agent **only**: the instruction to run `/start-next-issue --iteration <n+1>/3`, plus `<owner>/<repo>` and `<default-branch>`. Your run ends here -- don't loop back to step 0 yourself; the new agent rediscovers queue state from `gh`.
+  Give the new agent **only**: the instruction to run `/start-next-issue --iteration <n+1>/3 --chain <chain_id>`, plus `<owner>/<repo>` and `<default-branch>`. Pass **your own** `chain_id` -- the chain is one owner across its iterations, so the successor can resume a lane you left mid-flight. Your run ends here -- don't loop back to step 0 yourself; the new agent rediscovers queue state from `gh`.
 
 ## Stopping
 
@@ -149,10 +202,11 @@ Only reached once the PR is confirmed `MERGED` (step 5) and any drained PRD clos
 - **Ready set empty and every open issue is `hitl`** -> **exit, don't poll.** Only a human can make one ready. List them and stop.
 - **No open issues remain** -> queue drained -> exit and say so, regardless of iteration count.
 - **3-strike CI failure** -> halt the whole chain (step 5). No handoff.
-- **Usage limits kill the session mid-issue** -> a paused `in-progress` claim is left (out of the ready set, so siblings ignore it). Re-invoke `/start-next-issue --iteration <n>/3` (same `n`) when limits reset -- step 0 resumes it. If you don't know `n`, a bare `/start-next-issue` is safe (just a fresh budget).
+- **Usage limits kill the session mid-issue** -> a paused claim is left (its issue is `in-progress`, so it is out of the ready set and siblings ignore it). Re-invoke `/start-next-issue --iteration <n>/3 --chain <chain_id>` when limits reset -- step 0 matches the claim ref and resumes it. **The chain id is what makes the lane recoverable**, which is why step 0 prints it; lose it and the lane needs a human `--reclaim`. A bare `/start-next-issue` is always safe: it starts a fresh budget and takes new work rather than stealing the paused lane.
 
 ## Notes
-- **Crash-safe by construction:** the ready set IS the resume state -- no checkpoint file. A kill leaves at most one in-progress issue, recovered by step 0.
+- **Crash-safe by construction:** the claim refs on `origin` ARE the resume state -- no checkpoint file. A kill leaves at most one claimed issue, recovered by step 0.
+- **The claim ref is the only ownership record.** `@me` cannot answer "is this mine?" under a shared login, a label cannot be set atomically, and a filesystem lock does not span clones or hosts. Anything that reasons about ownership must read `refs/claims/issue-<n>`.
 - **Iteration count is chain state, not repo state:** it lives only in the `--iteration` handoff arg. If a chain dies before handoff, the count is lost -- re-invoking bare just starts a new budget, harmless.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, fine -- it rebases at its own merge gate.
 - **One issue per worktree/branch/PR -- never batch.** The one exception is a drive-by out-of-scope fix (step 4a) riding along under `## Out-of-scope fixes`; you still never deliberately pull another queue issue's slice in.

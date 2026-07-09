@@ -28,7 +28,7 @@ keep yourself in the loop.
 
 ## Requirements
 
-- Node.js, npm, Git, `gh` >= 2.94.0.
+- Node.js, npm, `gh` >= 2.94.0, `git` >= 2.13 (the issue-queue claim lock needs `--force-with-lease` with an empty expect).
 - A GitHub repository with an `origin` remote.
 - A GitHub token scoped to the skill in use (`bootstrap-issues` needs Contents, Issues, Pull requests, Administration).
 
