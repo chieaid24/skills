@@ -1,9 +1,9 @@
 ---
-name: fix-ui-drift
-description: Autonomous visual consistency pass. Screenshot every UI flow with the repo's browser runner, find defects (misalignment, overlap, clipped text, overflow) and drift from DESIGN.md or from the app's own dominant patterns, then dispatch a fix subagent per finding and re-run its probe until every flow is clean. Use for unattended UI polish, "fix the UI inconsistencies", "screenshot all the flows and check them", or agent-driven visual cleanup.
+name: ui-audit
+description: Audit and repair the visual consistency of a UI, unattended. Screenshot every flow with the repo's browser runner, find defects (misalignment, overlap, clipped text, overflow) and drift from DESIGN.md or from the app's own dominant patterns, then dispatch a fix subagent per finding and re-run its probe until every flow is clean. Use when the user wants to audit the UI, fix UI inconsistencies, or screenshot every flow and check it.
 ---
 
-# Fix UI Drift
+# UI Audit
 
 You are running unattended. Your job: capture every flow, prove what is visually wrong, repair it
 through implementation subagents, and show that each repair held. No human picks findings or
@@ -57,9 +57,9 @@ Use these terms exactly.
 
 ### 0. Setup
 
-Create the working branch from the default branch: `ui-drift-<yyyy-mm-dd>`.
+Create the working branch from the default branch: `ui-audit-<yyyy-mm-dd>`.
 
-Establish the **output directory** at `~/fix-ui-drift-skill/<repo-name>/run-<N>/`, where `<N>` is
+Establish the **output directory** at `~/ui-audit-skill/<repo-name>/run-<N>/`, where `<N>` is
 the next unused run integer. It holds `flows.md`, `shots/`, `ui-findings.json`, and `REPORT.md`.
 It lives outside the repo because screenshots must never be committed. Probes are the exception:
 they are code, and they ship with their fix.
@@ -122,7 +122,7 @@ For each finding:
    `DESIGN.md` rule it must satisfy, and the frozen contract from the hard rules.
 2. Run the finding's probe, then every other probe, then the repo's test suite.
 3. Green on all three: commit alone as `fix(ui): <what changed>`, with the probe committed
-   alongside under `e2e/ui-drift/`, so the finding cannot silently return.
+   alongside under `e2e/ui-audit/`, so the finding cannot silently return.
 4. Red: give the subagent two more attempts. Still red, or green only by weakening its own probe:
    revert the finding completely, re-run to confirm green is restored, mark it `reverted` with the
    reason.

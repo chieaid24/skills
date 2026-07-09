@@ -74,11 +74,11 @@ Write each probe as a test in the repo's own runner, so the fix loop and CI run 
 assertion:
 
 ```js
-// e2e/ui-drift/UD-004.spec.ts
+// e2e/ui-audit/UA-004.spec.ts
 // red: submit button left edge sits 3px right of the input above it
 import { test, expect } from '@playwright/test';
 
-test('UD-004: submit aligns with the email input', async ({ page }) => {
+test('UA-004: submit aligns with the email input', async ({ page }) => {
   await page.goto('/signup');
   const input = await page.getByLabel('Email').boundingBox();
   const submit = await page.getByRole('button', { name: 'Create account' }).boundingBox();
@@ -99,5 +99,5 @@ Rules that keep probes honest:
   it go red first. A probe that was never red proves nothing, and a subagent that "fixes" a finding
   by loosening its own probe has produced exactly that.
 
-Probes ship with their fix under `e2e/ui-drift/`, which is what stops a cleared finding from
+Probes ship with their fix under `e2e/ui-audit/`, which is what stops a cleared finding from
 quietly returning.
