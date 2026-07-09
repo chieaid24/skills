@@ -163,6 +163,7 @@ gh pr checks <pr> --watch
   gh pr merge <pr> --squash --delete-branch         # one commit per issue; CI fixes + drive-bys collapse
   gh pr view <pr> --json state --jq .state          # must read MERGED
   ```
+  If that fails with `Squash merges are not allowed on this repository`, the repo has `allow_squash_merge=false` (bootstrap sets it, but skips on a 403 from a PAT without Administration scope). Don't leave the PR open over a settings flag: retry with `--merge`, and say in your report that the repo forbids squash so a human can enable it.
   If not `MERGED` (branch out of date, protection rule), resolve and retry -- don't move on with an open PR. The merge's `Closes #<n>` closes the issue, but neither the label nor your claim clears itself -- **release both, in this order**:
   ```bash
   gh issue edit <n> --remove-label in-progress
