@@ -73,11 +73,9 @@ Summarize exactly what will change, then ask the user to confirm before applying
    # Autonomy — exactly one per work issue
    gh label create afk         --color C2E0C6 --description "Fully autonomous: an agent implements, tests, and merges it"   --force
    gh label create hitl        --color D93F0B --description "Human in the loop required; the autonomous worker skips it"    --force
-   # Parent spec
+   # Parent spec — carries neither autonomy label
    gh label create prd         --color 5319E7 --description "Product requirements document; parent of work slice issues"    --force
    ```
-
-   `afk` and `hitl` replace the old `## Type` body section: the autonomy of an issue is now machine-readable, so `/start-next-issue` can exclude `hitl` from its ready set instead of an agent parsing prose. Every work issue carries exactly one of the two; `prd` parents carry neither.
 
 5. **Commit + land the workflow.** Stage the shareable files (`.github/`, plus `DESIGN.md` for a frontend repo), commit (`chore: add agentic-issues CI + issue template`), and push so `ci.yml` reaches `<default-branch>` (direct push as owner, or open + merge a bootstrap PR — the PR carries the workflow so its own `test` check can run). The pre-commit hook files (step 3) were already committed by that skill; `CLAUDE.md`/`AGENTS.md` are gitignored and stay local, but `DESIGN.md` is committed so every agent shares it.
 
@@ -112,5 +110,5 @@ State what changed, anything skipped (e.g. branch protection when the scope was 
 - **`DESIGN.md` is the binding design system.** Committed and shared (not gitignored), auto-loaded by `/impeccable` from the repo root, and every future frontend agent must conform to it — the appended **Frontend / UI work** docs point UI work at it.
 - **GitHub-only** (uses `gh`). For repos hosted elsewhere, only the docs + templates apply.
 - Owner direct-pushes to the protected branch bypass the check (`enforce_admins=false`); agents go through PRs and hit the gate.
-- **`afk` / `hitl` gate autonomy, `ready` gates refinement.** They are orthogonal: a `hitl` issue is still labelled `ready` when it's fully specified. `/start-next-issue` requires `ready` **and** `afk`, so a `hitl` issue never enters the ready set — only a human works it, or relabels it `afk` once the decision it names is settled. That exclusion is why `hitl` can't be a body field: the ready set is a mechanical read, and it can't parse prose.
+- **`afk`/`hitl` gate autonomy; `ready` gates refinement.** Orthogonal: a fully specified `hitl` issue is still `ready`. `/start-next-issue` requires `ready` **and** `afk`, so `hitl` never enters the ready set — a human works it, or relabels it `afk` once its decision is settled. Autonomy is a label rather than a body field (it replaced a `## Type` section) because the ready set is a mechanical read that can't parse prose.
 - The dependency queue (`blocked-by` edges, the `ready`/`completed` rule, the autonomy labels, the claim mutex) is described in `templates/workflow-section.md` and consumed by `/start-next-issue`. Keep all four skills (`bootstrap-issues`, `/spec`, `/start-next-issue`, `/catch-up`) in agreement on those conventions.

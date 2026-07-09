@@ -50,24 +50,18 @@ Autonomy is a **label**, not a body section — `/start-next-issue` reads it mec
 issue gets exactly one:
 
 - **`afk`** — fully autonomous: an agent implements, tests, and merges it without human involvement.
-  **Prefer `afk`.**
 - **`hitl`** — a human is on the critical path: an architectural decision, a design review, or an
   external dependency (credentials, a third-party account, a human-only approval).
 
-**`hitl` costs real throughput** — the autonomous worker skips those issues entirely and they sit
-until a human picks them up, so anything they block sits too. Reach for it only when a human's
-judgement genuinely gates the work, never because a slice looks large or unfamiliar. If the only
-human input a slice needs is one decision, prefer resolving that decision *now* during the grill and
-publishing the issue `afk` with the decision written into `## Notes / context`.
-
-A `hitl` issue that blocks `afk` children is the sharpest cost in the queue — say so at the quiz
-(step 4) so the user can decide whether to resolve its decision up front instead.
+**Prefer `afk`.** The worker skips `hitl` entirely, so those issues sit until a human picks them up —
+and anything they block sits too. Never reach for it just because a slice looks large or unfamiliar.
+If the only human input a slice needs is one decision, settle it *now* during the grill and publish
+`afk` with the decision written into `## Notes / context`.
 
 ### Issue body template (every issue, single or batch)
 
-Autonomy lives in the labels (`afk` / `hitl`), so it has no section here. When an issue is `hitl`,
-state in `## Notes / context` exactly what human input it needs and who can give it — otherwise
-whoever picks it up has to reverse-engineer why it was flagged.
+Autonomy lives in the labels, so it has no section here. For a `hitl` issue, state in
+`## Notes / context` what human input it needs and who can give it.
 
 ```markdown
 ## Parent
@@ -129,8 +123,7 @@ Present the proposed issue(s). For each issue, show:
 - **Blocking**: pre-existing open issues that now depend on this issue (if any)
 - **User stories covered** (batch mode only, when source material has them)
 
-Call out any `hitl` issue that blocks other issues, and how many — that is the queue's throughput
-cost made concrete.
+Call out any `hitl` issue that blocks other issues, and how many — the throughput cost made concrete.
 
 Ask:
 - Do the issue(s) feel right? (for batch: granularity — too coarse / too fine?)
@@ -155,9 +148,9 @@ rm -f "$TMPDIR/issue-body.md"
 ```
 
 Label every issue `ready` **plus exactly one of `afk` / `hitl`** — including those with open
-blockers. `ready` means refined, not grabbable: actual grabbability is computed from dependency
-edges + `completed` state. Never ship an issue with both autonomy labels or neither — the worker
-treats an unlabelled issue as not-ready and skips it silently.
+blockers. `ready` means refined, not grabbable: grabbability is computed from dependency edges +
+`completed` state. Never ship both autonomy labels or neither; the worker skips an unlabelled issue
+silently.
 
 If the repo predates these labels, create them before publishing (`gh label list` to check):
 
@@ -173,8 +166,8 @@ Do NOT close or modify any parent or PRD issue.
 State each new issue number, its edges, and its status:
 
 - **grabbable** — `afk`, no open blockers; an agent takes it now.
-- **waiting** — `afk` with open blockers; it frees itself as they merge.
-- **awaiting human** — `hitl`; no agent will ever pick it up, blockers or not.
+- **waiting** — `afk` with open blockers; frees itself as they merge.
+- **awaiting human** — `hitl`; no agent picks it up, blockers or not.
 
 If the queue now has grabbable `afk` work, suggest `/start-next-issue`. If everything published is
 `hitl`, say so plainly — `/start-next-issue` would find an empty ready set and exit.

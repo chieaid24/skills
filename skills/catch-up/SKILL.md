@@ -65,7 +65,7 @@ gh issue list --state open --label blocked     --json number,title --limit 100
 gh issue list --state open --label hitl --json number,title,blockedBy,createdAt,updatedAt --limit 100
 ```
 
-`hitl` issues are excluded from `/start-next-issue`'s ready set by design — a human must work them or relabel them `afk`. Nothing in the automated loop ever touches them, so this report is the **only** thing that keeps them visible. Report each one, whether its blockers are all closed as `completed` (**actionable now**) or some remain open (**still waiting on upstream work**), and its age since creation. An actionable `hitl` issue that also blocks open `afk` issues is stalling the queue behind a human — surface it first, with the count of issues it blocks, and treat multi-run persistence as an escalation.
+`/start-next-issue` excludes `hitl` from its ready set by design, so nothing in the automated loop ever touches those issues — this report is the **only** thing keeping them visible. For each, give its age and whether its blockers are all closed as `completed` (**actionable now**) or some remain open (**waiting on upstream work**). An actionable `hitl` issue that blocks open `afk` issues is stalling the queue behind a human — surface it first with the count it blocks, and escalate it when it persists across runs.
 
 For every PR in the exact window, inspect its commits and changed files with `gh pr view <n> --json body,commits,files`. Derive what users or operators can now do from the diff, tests, PR body, and commit messages. Do not treat the PR title or linked issue title as sufficient evidence. Group closely related edits into one concise, concrete bullet per PR. Mention multiple shipped behaviors within that bullet when necessary, but omit issue and PR numbers from the shipped-content list.
 
@@ -148,7 +148,7 @@ dev-pid: <PID or n/a>
 - #38 <title> — abandoned blocker #30
 ```
 
-Carry a lane's **first-seen** date forward across runs (read it from the previous Active block) so stall age survives. Do the same for each `hitl` issue: how long it has been awaiting a human is the number that makes it escalate.
+Carry a lane's **first-seen** date forward across runs (read it from the previous Active block) so stall age survives. Do the same for each `hitl` issue — time awaiting a human is what escalates it.
 
 ## 7. Print the summary
 
@@ -181,7 +181,7 @@ Concise, sectioned, empty sections collapsed to a one-liner or omitted. Recommen
 Progress log → progress/progress.md
 ```
 
-Point resumable lanes at `/start-next-issue`; flag escalation candidates (multi-run stalls, CI-dead, long-actionable `hitl`) for a human decision. For each actionable `hitl` issue, the recommendation is always one of two things a human does: work it directly, or settle the decision it names and relabel it `afk` so an agent can. Recommend only — never relabel it yourself.
+Point resumable lanes at `/start-next-issue`; flag escalation candidates (multi-run stalls, CI-dead, long-actionable `hitl`) for a human decision. Recommend only — never relabel a `hitl` issue yourself.
 
 ## Running on a cron
 

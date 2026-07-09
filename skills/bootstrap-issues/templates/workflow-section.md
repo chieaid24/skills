@@ -13,9 +13,9 @@ Work is a **dependency-aware GitHub Issues queue** (on `origin`), not a `/tasks`
 
 **Labels**
 - **Lifecycle** (claim = assignee): `ready` → `in-progress` → `review` → `blocked`.
-- **Autonomy**, exactly one per work issue: `afk` — an agent implements, tests, and merges it unattended (preferred). `hitl` — needs a human in the loop (architectural decision, design review, external dependency).
+- **Autonomy**, exactly one per work issue: `afk` — an agent implements, tests, and merges it unattended (**prefer this**). `hitl` — a human's judgement genuinely gates it (architectural decision, design review, external dependency), not merely a hard-looking slice.
 
-**`hitl` issues never enter the ready set.** `/start-next-issue` walks past them however unblocked they are, so an autonomous chain never stalls waiting on someone who is away. They wait for a human, who either works the issue directly or relabels it `afk` once the decision it needed is made. `/catch-up` lists them under **Awaiting human** so they don't rot in the queue. Prefer `afk`: reach for `hitl` only when a human's judgement is genuinely on the critical path, not because a slice looks hard.
+**`hitl` never enters the ready set.** `/start-next-issue` walks past it however unblocked it looks, so an unattended chain never stalls on an absent human. A human works it, or relabels it `afk` once the decision is settled; `/catch-up` lists them under **Awaiting human** so they don't rot.
 
 **File contention is NOT a dependency.** Two issues touching the same file run in parallel; the second PR to land rebases on `<default-branch>` and re-runs CI. Don't serialize on predicted file overlap.
 

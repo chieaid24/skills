@@ -5,10 +5,10 @@ title: ""
 labels: ready, afk
 ---
 
-<!-- Autonomy is a label, not a body field. This template applies `afk` — fully autonomous:
-     implement, test, and merge with no human involvement (preferred). Swap it for `hitl` when the
-     slice needs a human in the loop (architectural decision, design review, external dependency);
-     `/start-next-issue` skips `hitl` issues, so a human must pick them up. Exactly one of the two. -->
+<!-- Autonomy is a label, not a body field — exactly one of the two. This template applies `afk`:
+     fully autonomous, no human involvement (preferred). Swap it for `hitl` when a human's judgement
+     gates the slice (architectural decision, design review, external dependency); `/start-next-issue`
+     skips `hitl`, so a human picks it up. -->
 
 ## Parent
 
