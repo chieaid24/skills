@@ -140,13 +140,13 @@ One issue -> one worktree -> one branch. Cut the branch from **fresh** `<default
 git fetch origin
 git worktree add -b <n>-<slug> .worktrees/<n>-<slug> origin/<default-branch>
 ```
-If the worktree already exists (resume, step 0), reuse it -- `git worktree list` for the path. If the *branch* exists but its worktree is gone (a crashed lane you just adopted), `git worktree add` fails with `branch already exists`; re-attach instead of forcing a new branch: `git worktree add .worktrees/<n>-<slug> <n>-<slug>`. Then `cd .worktrees/<n>-<slug>` and stay there. Implement the slice to its acceptance criteria, commit, and open the PR with `Closes #<n>`:
+If the worktree already exists (resume, step 0), reuse it -- `git worktree list` for the path. If the *branch* exists but its worktree is gone (a crashed lane you just adopted), `git worktree add` fails with `branch already exists`; re-attach instead of forcing a new branch: `git worktree add .worktrees/<n>-<slug> <n>-<slug>`. Then `cd .worktrees/<n>-<slug>` and stay there. Implement the slice to its acceptance criteria, then **verify it the way this repo prescribes** -- follow the verification rules in the repo's `CLAUDE.md`/`AGENTS.md` (the repo is ground truth for how work is proven here: which flows to drive, which suites to run, what evidence to capture). If the repo names no verification method, fall back to driving the affected flow end-to-end yourself. Only once it is verified: commit, and open the PR with `Closes #<n>`:
 ```bash
 gh pr create --head <n>-<slug> --title "<title>" --body "Closes #<n>"
 ```
 
 ### 4a. Own the whole platform, not just your slice
-You are an owner of the entire product, not a narrow ticket-closer. While you implement and **validate** your slice (run the app, exercise the flow end-to-end, read the code you touch and around it), watch for anything broken, regressed, or visibly wrong **anywhere** -- a crash, broken flow, wrong result, mangled/misaligned UI, dead link, failing/flaky test, a lint error you pass through. Assume nobody else will catch it.
+You are an owner of the entire product, not a narrow ticket-closer. While you implement and **validate** your slice (per the repo's `CLAUDE.md`/`AGENTS.md` verification rules -- run the app, exercise the flow end-to-end, read the code you touch and around it), watch for anything broken, regressed, or visibly wrong **anywhere** -- a crash, broken flow, wrong result, mangled/misaligned UI, dead link, failing/flaky test, a lint error you pass through. Assume nobody else will catch it.
 
 **Fix it autonomously in this worktree and ship it in the same PR** -- don't defer, don't leave it for another agent, don't ask first. Keep the `Closes #<n>` line, then add an **`## Out-of-scope fixes`** section listing each drive-by fix (what was broken, where, what changed).
 
