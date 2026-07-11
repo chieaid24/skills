@@ -58,10 +58,29 @@ and anything they block sits too. Never reach for it just because a slice looks 
 If the only human input a slice needs is one decision, settle it *now* during the grill and publish
 `afk` with the decision written into `## Notes / context`.
 
-### Issue body template (every issue, single or batch)
+### Issue body — read the repo's issue template (source of truth)
 
-Autonomy lives in the labels, so it has no section here. For a `hitl` issue, state in
-`## Notes / context` what human input it needs and who can give it.
+**Do not carry your own body shape.** The repo's GitHub issue template is the single per-repo source
+of truth for issue structure, so agent-filed and human-filed (web UI) issues stay identical. Read it:
+
+```bash
+cat .github/ISSUE_TEMPLATE/task.md   # the agent-task template bootstrap-issues installs
+```
+
+Use its section skeleton as the body, filling each section for this slice:
+
+- **Strip the YAML frontmatter** (`--- … ---`) — `--body-file` treats the file as literal markdown, so
+  frontmatter would render as junk in the issue. Labels come from `--label` flags in §5, never the body.
+- **Replace every `<!-- guidance -->` comment** with real content (or delete it) — the comments are
+  fill instructions, not issue text.
+- **Keep the template's repo-specific lines verbatim** — its `## Definition of done` carries this
+  repo's real gates (e.g. a `DESIGN.md` conformance line, the branch-naming convention). That is the
+  whole point of reading it: those bits must not be hardcoded generically here.
+- Autonomy lives in the labels, so fill no autonomy field. For a `hitl` issue, state in
+  `## Notes / context` what human input it needs and who can give it.
+
+**Fallback — only if `.github/ISSUE_TEMPLATE/task.md` is absent** (repo not bootstrapped for the
+queue). Use this generic skeleton; the repo template, when present, always wins:
 
 ```markdown
 ## Parent
@@ -151,6 +170,12 @@ Label every issue `ready` **plus exactly one of `afk` / `hitl`** — including t
 blockers. `ready` means refined, not grabbable: grabbability is computed from dependency edges +
 `completed` state. Never ship both autonomy labels or neither; the worker skips an unlabelled issue
 silently.
+
+**Where the labels come from:** `--body-file` ignores the template's frontmatter, so labels are
+always explicit `--label` flags. Take the **lifecycle** label (`ready`) from the repo template's
+`labels:` line; **always append your own per-issue autonomy pick** (`afk` or `hitl`) from §2's
+decision — overriding whatever autonomy default the template lists (its `afk` is just the human web-UI
+default). So: `--label ready --label <afk|hitl>`.
 
 If the repo predates these labels, create them before publishing (`gh label list` to check):
 
