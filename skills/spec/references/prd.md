@@ -1,7 +1,7 @@
 # PRD reference
 
 Followed by `/spec` on the **PRD path** (a large, multi-slice feature worth a durable spec).
-Synthesize what grilling already established — do NOT re-interview. Publish in one shot.
+Synthesize what grilling already established - do NOT re-interview. Publish in one shot.
 
 Before writing, read the current `CONTEXT.md` and any ADRs in `docs/adr/` written during Phase 1.
 Use the canonical terms throughout and surface relevant ADRs under Implementation Decisions.
@@ -23,7 +23,7 @@ Use the canonical terms throughout and surface relevant ADRs under Implementatio
    Delete the temp file after creation.
 
 4. Record the new issue number, then continue to `references/create-issues.md` in **batch mode**
-   with this PRD as the parent — every child issue references it in `## Parent`.
+   with this PRD as the parent - every child issue references it in `## Parent`.
 
 ---
 
@@ -54,7 +54,7 @@ Decisions made during the grilling session. Include:
 - API contracts
 - Key interactions
 
-Do NOT include specific file paths or code snippets — they go stale.
+Do NOT include specific file paths or code snippets - they go stale.
 
 Exception: if a prototype produced a snippet that encodes a decision more precisely than prose can (state machine, reducer, schema, type shape), inline it and note it came from a prototype. Trim to decision-rich parts only.
 

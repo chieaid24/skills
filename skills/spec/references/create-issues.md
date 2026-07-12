@@ -2,20 +2,20 @@
 
 The shared issue-creation flow. Both `/spec` routes converge here:
 
-- **PRD path** — a `[PRD]` issue was just published (see `references/prd.md`). Source is the PRD;
+- **PRD path** - a `[PRD]` issue was just published (see `references/prd.md`). Source is the PRD;
   run **batch mode** with the PRD as parent.
-- **Issues-only path** — a small change; no PRD. Source is the grilled context; run **single mode**
+- **Issues-only path** - a small change; no PRD. Source is the grilled context; run **single mode**
   (one slice) or a **small batch** (a few independent slices), with no parent.
 
-Create dependency-aware issues — one or many — and slot them into the existing queue. Always
+Create dependency-aware issues - one or many - and slot them into the existing queue. Always
 reconcile against the open graph; always quiz before publishing.
 
 ## 0. Confirm mode
 
-- **Batch** — a plan or PRD is the source. Break into tracer-bullet vertical slices. (PRD path is
+- **Batch** - a plan or PRD is the source. Break into tracer-bullet vertical slices. (PRD path is
   always batch; the small path may also be a small batch when grilling surfaced a few independent
   tasks.)
-- **Single** — one specific change with no decomposition needed. Create one issue.
+- **Single** - one specific change with no decomposition needed. Create one issue.
 
 If ambiguous, ask.
 
@@ -33,7 +33,7 @@ If the codebase is unfamiliar, explore it. Issue titles and descriptions must us
 
 ### Single mode
 
-Draft one **tracer-bullet vertical slice** — narrow but complete end-to-end, independently mergeable.
+Draft one **tracer-bullet vertical slice** - narrow but complete end-to-end, independently mergeable.
 
 ### Batch mode
 
@@ -46,19 +46,19 @@ For large decompositions, consider a **parent issue** that scopes the overall wo
 
 ### Label each draft `afk` or `hitl`
 
-Autonomy is a **label**, not a body section — `/start-next-issue` reads it mechanically. Every work
+Autonomy is a **label**, not a body section - `/start-next-issue` reads it mechanically. Every work
 issue gets exactly one:
 
-- **`afk`** — fully autonomous: an agent implements, tests, and merges it without human involvement.
-- **`hitl`** — a human is on the critical path: an architectural decision, a design review, or an
+- **`afk`** - fully autonomous: an agent implements, tests, and merges it without human involvement.
+- **`hitl`** - a human is on the critical path: an architectural decision, a design review, or an
   external dependency (credentials, a third-party account, a human-only approval).
 
-**Prefer `afk`.** The worker skips `hitl` entirely, so those issues sit until a human picks them up —
+**Prefer `afk`.** The worker skips `hitl` entirely, so those issues sit until a human picks them up -
 and anything they block sits too. Never reach for it just because a slice looks large or unfamiliar.
 If the only human input a slice needs is one decision, settle it *now* during the grill and publish
 `afk` with the decision written into `## Notes / context`.
 
-### Issue body — read the repo's issue template (source of truth)
+### Issue body - read the repo's issue template (source of truth)
 
 **Do not carry your own body shape.** The repo's GitHub issue template is the single per-repo source
 of truth for issue structure, so agent-filed and human-filed (web UI) issues stay identical. Read it:
@@ -69,17 +69,17 @@ cat .github/ISSUE_TEMPLATE/task.md   # the agent-task template bootstrap-issues 
 
 Use its section skeleton as the body, filling each section for this slice:
 
-- **Strip the YAML frontmatter** (`--- … ---`) — `--body-file` treats the file as literal markdown, so
-  frontmatter would render as junk in the issue. Labels come from `--label` flags in §5, never the body.
-- **Replace every `<!-- guidance -->` comment** with real content (or delete it) — the comments are
+- **Strip the YAML frontmatter** (`--- ... ---`) - `--body-file` treats the file as literal markdown, so
+  frontmatter would render as junk in the issue. Labels come from `--label` flags in section 5, never the body.
+- **Replace every `<!-- guidance -->` comment** with real content (or delete it) - the comments are
   fill instructions, not issue text.
-- **Keep the template's repo-specific lines verbatim** — its `## Definition of done` carries this
+- **Keep the template's repo-specific lines verbatim** - its `## Definition of done` carries this
   repo's real gates (e.g. a `DESIGN.md` conformance line, the branch-naming convention). That is the
   whole point of reading it: those bits must not be hardcoded generically here.
 - Autonomy lives in the labels, so fill no autonomy field. For a `hitl` issue, state in
   `## Notes / context` what human input it needs and who can give it.
 
-**Fallback — only if `.github/ISSUE_TEMPLATE/task.md` is absent** (repo not bootstrapped for the
+**Fallback - only if `.github/ISSUE_TEMPLATE/task.md` is absent** (repo not bootstrapped for the
 queue). Use this generic skeleton; the repo template, when present, always wins:
 
 ```markdown
@@ -90,7 +90,7 @@ A reference to the parent PRD or tracking issue on the issue tracker. Omit if st
 ## What to build
 
 Concise end-to-end description of this slice. Describe behavior, not layer-by-layer implementation.
-Avoid specific file paths — they go stale fast. Exception: if a prototype produced a snippet that
+Avoid specific file paths - they go stale fast. Exception: if a prototype produced a snippet that
 encodes a decision more precisely than prose (state machine, schema, type shape), inline it and
 note it came from a prototype.
 
@@ -100,7 +100,7 @@ note it came from a prototype.
 
 ## Blocked by
 
-- #<issue> description (or "None — can start immediately")
+- #<issue> description (or "None - can start immediately")
 
 ## Definition of done
 
@@ -123,8 +123,8 @@ gh issue list --state open --json number,title,body,labels --limit 100
 
 For each drafted issue, determine edges in **both** directions:
 
-- **blocked-by (upward)** — open issues whose code/output must exist first.
-- **blocking (downward)** — open issues that now logically need *this* issue first (e.g. it extracts a shared helper or introduces a type they assume). **Always evaluate this direction** — a missing downward edge is the silent, dangerous failure.
+- **blocked-by (upward)** - open issues whose code/output must exist first.
+- **blocking (downward)** - open issues that now logically need *this* issue first (e.g. it extracts a shared helper or introduces a type they assume). **Always evaluate this direction** - a missing downward edge is the silent, dangerous failure.
 
 **Logical dependencies only.** File overlap is contention, handled at merge via rebase; never model it as an edge.
 
@@ -137,18 +137,18 @@ For batch mode: also model edges *between* the new slices themselves.
 Present the proposed issue(s). For each issue, show:
 
 - **Title**
-- **Autonomy**: `afk` / `hitl` — for `hitl`, the specific human input it needs
+- **Autonomy**: `afk` / `hitl` - for `hitl`, the specific human input it needs
 - **Blocked by**: other slices or pre-existing open issues that must complete first
 - **Blocking**: pre-existing open issues that now depend on this issue (if any)
 - **User stories covered** (batch mode only, when source material has them)
 
-Call out any `hitl` issue that blocks other issues, and how many — the throughput cost made concrete.
+Call out any `hitl` issue that blocks other issues, and how many - the throughput cost made concrete.
 
 Ask:
-- Do the issue(s) feel right? (for batch: granularity — too coarse / too fine?)
+- Do the issue(s) feel right? (for batch: granularity - too coarse / too fine?)
 - Are the dependency relationships correct?
 - (Batch) Should any slices be merged or split further?
-- Are the `afk` / `hitl` labels correct — can any `hitl` become `afk` by settling its decision now?
+- Are the `afk` / `hitl` labels correct - can any `hitl` become `afk` by settling its decision now?
 
 Iterate until the user approves.
 
@@ -166,15 +166,15 @@ gh issue edit <n> --add-blocking  <C> [--add-blocking  <D> ...]      # C, D now 
 rm -f "$TMPDIR/issue-body.md"
 ```
 
-Label every issue `ready` **plus exactly one of `afk` / `hitl`** — including those with open
+Label every issue `ready` **plus exactly one of `afk` / `hitl`** - including those with open
 blockers. `ready` means refined, not grabbable: grabbability is computed from dependency edges +
 `completed` state. Never ship both autonomy labels or neither; the worker skips an unlabelled issue
 silently.
 
 **Where the labels come from:** `--body-file` ignores the template's frontmatter, so labels are
 always explicit `--label` flags. Take the **lifecycle** label (`ready`) from the repo template's
-`labels:` line; **always append your own per-issue autonomy pick** (`afk` or `hitl`) from §2's
-decision — overriding whatever autonomy default the template lists (its `afk` is just the human web-UI
+`labels:` line; **always append your own per-issue autonomy pick** (`afk` or `hitl`) from section 2's
+decision - overriding whatever autonomy default the template lists (its `afk` is just the human web-UI
 default). So: `--label ready --label <afk|hitl>`.
 
 If the repo predates these labels, create them before publishing (`gh label list` to check):
@@ -190,17 +190,17 @@ Do NOT close or modify any parent or PRD issue.
 
 State each new issue number, its edges, and its status:
 
-- **grabbable** — `afk`, no open blockers; an agent takes it now.
-- **waiting** — `afk` with open blockers; frees itself as they merge.
-- **awaiting human** — `hitl`; no agent picks it up, blockers or not.
+- **grabbable** - `afk`, no open blockers; an agent takes it now.
+- **waiting** - `afk` with open blockers; frees itself as they merge.
+- **awaiting human** - `hitl`; no agent picks it up, blockers or not.
 
 If the queue now has grabbable `afk` work, suggest `/start-next-issue`. If everything published is
-`hitl`, say so plainly — `/start-next-issue` would find an empty ready set and exit.
+`hitl`, say so plainly - `/start-next-issue` would find an empty ready set and exit.
 
 ## Notes
 
-- **`gh` >= 2.94.0** required for dependency flags — fail loudly on older versions.
+- **`gh` >= 2.94.0** required for dependency flags - fail loudly on older versions.
 - Never model file contention as a dependency edge.
 - Scan the open issue set for duplicates before creating.
-- `prd` parents carry neither `afk` nor `hitl` — autonomy applies to work slices, and a PRD is never
+- `prd` parents carry neither `afk` nor `hitl` - autonomy applies to work slices, and a PRD is never
   worked directly. `/start-next-issue` closes it when its last child merges.
