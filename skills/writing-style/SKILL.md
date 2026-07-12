@@ -1,6 +1,6 @@
 ---
 name: writing-style
-description: "House writing style for prose an agent ships: PR and issue bodies, READMEs and docs, commit messages, and code comments. Use before drafting or editing any of them."
+description: "House writing style for the prose an agent ships to humans: PR bodies and READMEs. Use before drafting or editing either one."
 ---
 
 # Writing Style
@@ -65,9 +65,7 @@ If no overlay exists, the default voice is the one described at the top of this 
 
 ## Artifacts
 
-Each artifact adds structure on top of the rules above. Read the one you are about to write:
+Two artifacts invoke this skill, and each adds structure on top of the rules above. Read the one you are about to write:
 
-- [PR and issue bodies](references/pr-and-issues.md)
-- [READMEs and docs](references/readmes-and-docs.md)
-- [Commit messages](references/commits.md)
-- [Code comments](references/comments.md)
+- [PR bodies](references/pr-bodies.md)
+- [READMEs](references/readmes.md)

@@ -1,4 +1,4 @@
-# PR and issue bodies
+# PR bodies
 
 ## The diff already says what
 
@@ -25,18 +25,12 @@ Sections are optional and earn their place. A one-line fix gets a one-line body.
 
 ## Title
 
-The title is the line most people read and the only line some people read. Same rule as a commit subject: imperative, specific, no type-and-scope noise beyond what the repo convention requires.
+The title is the line most people read and the only line some people read. Imperative, specific, and following whatever type-and-scope convention the repo already uses.
 
-`fix(auth): treat expiry as exclusive` beats `fix(auth): fix bug in auth middleware`.
+Name the actual change, not its category: `fix(auth): treat expiry as exclusive` beats `fix(auth): fix bug in auth middleware`.
 
 ## Verification is not a promise
 
 `Tests pass` is a claim with no evidence and no information. Say what you ran and what happened: `pytest tests/auth: 34 passed. Reproduced the 401 against staging, confirmed the fix clears it.`
 
 If a change has no runtime surface you could exercise, say that plainly rather than implying coverage you do not have.
-
-## Issue bodies
-
-An issue is a request for work, so it is written for whoever picks it up cold - possibly an agent, with no memory of the conversation that produced it.
-
-State the observable problem, the expected behavior, and how to reproduce or where to look. Leave the solution open unless the solution is the point; an issue that prescribes an implementation forecloses the thinking the assignee is there to do.
