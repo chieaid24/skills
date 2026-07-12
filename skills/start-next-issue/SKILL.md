@@ -87,7 +87,7 @@ The ready set is a **filter, not a claim** -- it narrows candidates cheaply, and
 Side-effect of this read: report **ready-set width** and any **zombies** (claim ref present + `in-progress` + no open PR). Width below the number of running agents means the DAG is too deep -- re-slice. Leave zombies alone (usually paused lanes -- do not reclaim; step 0 owns the only reclaim rule). Also name any open `hitl` issue whose blockers are all `completed` -- it is **waiting on a human**.
 
 ### 2. Select -- most-blocking first
-Pick the ready issue that unblocks the **most** downstream issues: for each candidate `C`, count open `X` where `C ∈ X.blockedBy` (invert the data you already fetched). Highest wins; tiebreak lowest issue number.
+Pick the ready issue that unblocks the **most** downstream issues: for each candidate `C`, count open `X` where `C in X.blockedBy` (invert the data you already fetched). Highest wins; tiebreak lowest issue number.
 
 ### 2a. Pinned start (only when an argument was given)
 Skip steps 1-2 and resolve the target:
@@ -228,10 +228,8 @@ RESULT: hitl-only                            # only human-gated issues remain
 - **Usage limits kill the orchestrator mid-issue** -> a paused claim is left (its issue is `in-progress`, so it is out of the ready set and siblings ignore it). Re-invoke `/start-next-issue --iteration <n>/3 --chain <chain_id>` when limits reset -- step 0 matches the claim ref and resumes it, then orchestration continues. **The chain id is what makes the lane recoverable**, which is why step 0 prints it; lose it and the lane needs a human `--reclaim`. A bare `/start-next-issue` is always safe: it starts a fresh budget and takes new work rather than stealing the paused lane.
 
 ## Notes
-- **Crash-safe by construction:** the claim refs on `origin` ARE the resume state -- no checkpoint file. A kill leaves at most one claimed issue, recovered by step 0.
-- **The claim ref is the only ownership record.** `@me` cannot answer "is this mine?" under a shared login, a label cannot be set atomically, and a filesystem lock does not span clones or hosts. Anything that reasons about ownership must read `refs/claims/issue-<n>`.
+- **The claim ref is the only ownership record, and the only resume state.** `@me` cannot answer "is this mine?" under a shared login, a label cannot be set atomically, and a filesystem lock does not span clones or hosts -- so anything reasoning about ownership reads `refs/claims/issue-<n>`. Because those refs live on `origin` there is no checkpoint file: a kill leaves at most one claimed issue, recovered by step 0.
 - **Iteration count is orchestrator state, not repo state:** it lives in the orchestrator's own loop and the `--worker <n>/3` arg it passes down. If the orchestrator dies, the count dies with it -- re-invoke with `--iteration` to resume the old budget, or bare to start a new one, harmless.
-- **Errors travel up, never sideways.** A worker never decides the run continues: it works one issue, reports, and ends. Only the orchestrator dispatches, and it stops at the first non-`merged` result.
 - **File contention is not a dependency:** if the next ready issue overlaps a just-opened PR's files, fine -- it rebases at its own merge gate.
 - **One issue per worktree/branch/PR -- never batch.** The one exception is a drive-by out-of-scope fix (step 4a) riding along under `## Out-of-scope fixes`; you still never deliberately pull another queue issue's slice in.
 - **`hitl` is a hard skip, never a judgement call.** The label is the whole test -- don't reason from the body that one "looks autonomous enough", and never relabel it `afk` to unblock yourself. Only a human moves an issue between the two. Sole exception: an explicit pin (step 2a).

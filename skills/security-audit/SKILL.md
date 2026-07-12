@@ -112,7 +112,7 @@ Route every confirmed finding by `overall_severity` - this split is the whole sa
 
 Why the split: on a public repo the fix diff itself discloses the vulnerability, so a HIGH/CRITICAL must go through coordinated disclosure (advisory + fix published together), never a public artifact that broadcasts an unpatched hole. LOW/MEDIUM disclosure is the accepted tradeoff of fixing the bug in the open. The severity gate is the whole safety mechanism - do not widen the public path for a public repo.
 
-`file-findings.cjs` is **idempotent** and this is what makes GitHub the store: each artifact embeds a fingerprint marker (`AUDIT-FINDING:<fp>`) derived from the trace's file+function locations (line-independent, so it survives code drift) plus the title. Phase 7 skips any finding whose fix PR is already open or merged; the filer skips any finding already tracked by an open issue or existing advisory. So a weekly re-scan neither re-fixes nor duplicates. Neither reopens closed items nor closes fixed ones - triage the open queue by hand on a small repo.
+`file-findings.cjs` is **idempotent** and this is what makes GitHub the store: each artifact embeds a fingerprint marker (`AUDIT-FINDING:<fp>`) derived from the trace's file+function locations (line-independent, so it survives code drift) plus the title. Phase 7 skips any finding whose fix PR is already open or merged; the filer skips any finding already tracked by an open issue or existing advisory (the re-scan safety and by-hand triage described under Coverage).
 
 For the fallback subset (findings whose fix failed) and the high/critical advisories, invoke the filer directly. ALWAYS dry-run first and read the public bodies it prints - confirm no exploit detail leaked through free-text fields:
 
