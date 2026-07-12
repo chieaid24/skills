@@ -8,7 +8,7 @@ keep yourself in the loop.
 
 ## Quickstart
 
-Run the installer and add every skill to Codex and Claude Code:
+Run the installer and add the skills to your coding agents:
 
 ```bash
 npx skills@latest add chieaid24/skills
