@@ -35,11 +35,15 @@ All ten are model-invoked: the agent can reach for one on its own when the task 
 
 ### Autonomous audit passes
 
-- [**code-audit**](skills/code-audit) - Deepens shallow modules through subagents, reverting any change the unit, integration, and E2E suites cannot prove behaviour-preserving. Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT).
+- [**code-audit**](skills/code-audit) - Deepens shallow modules through subagents, reverting any change the unit, integration, and E2E suites cannot prove behaviour-preserving.
 - [**ui-audit**](skills/ui-audit) - Screenshots every flow, measures visual defects and design-system drift, and fixes each with a committed probe that was red before and green after.
-- [**security-audit**](skills/security-audit) - Multi-agent hunt for exploitable vulnerabilities: recon, attack-class hunting, adversarial validation, and a schema-checked report. Vendored from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT).
+- [**security-audit**](skills/security-audit) - Multi-agent hunt for exploitable vulnerabilities: recon, attack-class hunting, adversarial validation, and a schema-checked report.
 
 ### Writing and meta
 
-- [**writing-great-skills**](skills/writing-great-skills) - The vocabulary and principles for writing skills that behave predictably, backed by a full `GLOSSARY.md`. Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT).
+- [**writing-great-skills**](skills/writing-great-skills) - The vocabulary and principles for writing skills that behave predictably, backed by a full `GLOSSARY.md`.
 - [**writing-style**](skills/writing-style) - House style for anything a reader outside the work sees, tuned to fight a model's prose defaults.
+
+## Credits
+
+`code-audit` and `writing-great-skills` are adapted from [mattpocock/skills](https://github.com/mattpocock/skills), and `security-audit` from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill), all MIT-licensed.
