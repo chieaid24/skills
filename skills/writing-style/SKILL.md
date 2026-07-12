@@ -1,6 +1,6 @@
 ---
 name: writing-style
-description: "House writing style for the prose an agent ships to humans: PR bodies and READMEs. Use before drafting or editing either one."
+description: "House writing style for published prose - anything a reader outside the work will see. Use when writing or editing a README, a blog post, release notes, an announcement, a docs page, landing or marketing copy, a changelog entry, or a PR body."
 ---
 
 # Writing Style
@@ -8,6 +8,14 @@ description: "House writing style for the prose an agent ships to humans: PR bod
 Terse, imperative, engineer-facing prose, after the Google developer documentation style. Second person, present tense, active voice.
 
 The rules below fight the defaults a language model brings to prose. They are the whole guide; per-artifact structure lives behind the pointers in [Artifacts](#artifacts).
+
+## Scope: the reader is a stranger
+
+This skill governs **published prose** - anything read by someone outside the work: a README, a post, release notes, an announcement, a docs page, landing copy, a PR body. The test is whether a reader who was not in the room will see it.
+
+That reader has none of your context. They do not know the ticket number, the internal codename, the teammate you argued with, or the acronym your team coined last month. Published prose carries its own context or it fails.
+
+The **internal technical record** - commit messages, code comments - is written for someone inside the work, reading with the diff open. It follows the repo's own convention, and this skill stays out of it.
 
 ## The reader's next action
 
@@ -65,7 +73,10 @@ If no overlay exists, the default voice is the one described at the top of this 
 
 ## Artifacts
 
-Two artifacts invoke this skill, and each adds structure on top of the rules above. Read the one you are about to write:
+Each artifact adds structure on top of the rules above. Read the one you are about to write:
 
+- [READMEs](references/readmes.md) - and docs pages, which share its shape
+- [Posts](references/posts.md) - blog posts, announcements, release notes, changelogs, landing copy
 - [PR bodies](references/pr-bodies.md)
-- [READMEs](references/readmes.md)
+
+An artifact with no reference file of its own still takes the rules above, and borrows the shape of whichever of the three it most resembles.
