@@ -43,7 +43,3 @@ All ten are model-invoked: the agent can reach for one on its own when the task 
 
 - [**writing-great-skills**](skills/writing-great-skills) - The vocabulary and principles for writing skills that behave predictably, backed by a full `GLOSSARY.md`. Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT).
 - [**writing-style**](skills/writing-style) - House style for anything a reader outside the work sees, tuned to fight a model's prose defaults.
-
-## License
-
-[MIT](LICENSE)
