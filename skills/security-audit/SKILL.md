@@ -117,13 +117,13 @@ Why the split: on a public repo the fix diff itself discloses the vulnerability,
 For the fallback subset (findings whose fix failed) and the high/critical advisories, invoke the filer directly. ALWAYS dry-run first and read the public bodies it prints - confirm no exploit detail leaked through free-text fields:
 
 ```
-node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human> --dry-run
+node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human> --issue-label security --dry-run
 
 # then file for real, capturing the GHSA ids Phase 7 needs to build private forks
-node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human> --emit-map <scratch-dir>/filed.json
+node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human> --issue-label security --emit-map <scratch-dir>/filed.json
 ```
 
-`--emit-map` writes a JSON array of `{fp, kind, ref}` for every artifact filed, so Phase 7 reads a high/critical finding's GHSA id deterministically instead of scraping stdout. Requires the `gh` CLI authenticated with repo access; filing advisories needs the security-advisories API enabled (default on public repos). The target repo must be bootstrapped for the queue - `ready`/`afk` labels, the CI `test` gate, branch protection, and auto-merge (see the `bootstrap-issues` flow). Run `--help` for all options (`--issue-label`, `--min-confidence`, `--verbatim-titles`).
+`--issue-label security` tags every fallback issue so it reads as audit work in the queue and `/catch-up`; the repo's `bootstrap-issues` run creates that label. `--emit-map` writes a JSON array of `{fp, kind, ref}` for every artifact filed, so Phase 7 reads a high/critical finding's GHSA id deterministically instead of scraping stdout. Requires the `gh` CLI authenticated with repo access; filing advisories needs the security-advisories API enabled (default on public repos). The target repo must be bootstrapped for the queue - `ready`/`afk`/`security` labels, the CI `test` gate, branch protection, and auto-merge (see the `bootstrap-issues` flow). Run `--help` for all options (`--issue-label`, `--min-confidence`, `--verbatim-titles`).
 
 ## Cleanup
 

@@ -111,6 +111,6 @@ Return exactly one:
 Act on the verdict:
 
 - **FIXED**: let the delivery from Phase 7 stand (the public PR auto-merges through the `test` gate; the private fork PR waits for its human).
-- **NOT-FIXED / REGRESSION**: the fix failed. Close the PR, remove the fix worktree and branch, and add the finding to a **fallback set**. After the loop, file the fallback set with `file-findings.cjs` (its normal issue/advisory path) so the work is tracked instead of lost - this is the replace-filing fallback.
+- **NOT-FIXED / REGRESSION**: the fix failed. Close the PR, remove the fix worktree and branch, and add the finding to a **fallback set**. After the loop, file the fallback set with `file-findings.cjs --issue-label security` (its normal issue/advisory path) so the work is tracked instead of lost - this is the replace-filing fallback.
 
 The per-fix verifier is the immediate proof. The **weekly full re-scan is the codebase-level backstop**: because dedup skips only delivered fixes, any vulnerability a fix failed to close reappears in the next run and gets another attempt.
