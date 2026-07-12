@@ -106,4 +106,4 @@ Apply the agent's corrections:
 
 After applying corrections, reconcile the prose deliverables: update `REPORT.md` and `FINDINGS-DETAIL.md` so they match the final `findings.json`. Remove or amend any finding the verification gate rejected or corrected — the human-readable report and the machine-readable output must not disagree.
 
-This is the final quality gate. Do not skip it.
+This is the last gate before remediation — only findings that survive it reach the Phase 7 fix subagents. Do not skip it.

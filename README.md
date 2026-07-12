@@ -19,6 +19,7 @@ keep yourself in the loop.
 | **ui-audit** | Autonomous visual consistency pass: screenshot every flow with the repo's own E2E runner, measure defects (misalignment, overlap, clipping, contrast) and drift from `DESIGN.md` or the app's dominant pattern, then repair each finding through a subagent and prove it with a committed probe that was red before and green after. |
 | **security-audit** | Multi-agent security audit of a codebase: reconnaissance, attack-class hunting, validation, and a schema-checked findings report. Targets exploitable issues with real impact. Vendored from [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT). |
 | **writing-great-skills** | Reference for writing and editing skills: invocation trade-offs, description triggers, the steps-vs-reference information hierarchy, completion criteria, with a full `GLOSSARY.md` of the vocabulary. Vendored from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). |
+| **writing-style** | House style for prose an agent ships: PR and issue bodies, READMEs and docs, commit messages, code comments. Rules that fight a model's prose defaults (hype, throat-clearing, restating the diff, over-structuring, em dashes), plus an optional private voice overlay at `~/.agents/writing/voice/VOICE.md` that calibrates tone from your own writing samples. |
 
 ## How it works
 

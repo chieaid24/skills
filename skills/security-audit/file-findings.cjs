@@ -40,6 +40,10 @@
  *                           (low|medium|high; default low = file everything).
  *   --verbatim-titles       Use the finding's real title for public issues
  *                           instead of a neutral derived one (off by default).
+ *   --emit-map <file>       Write a JSON array of {fp, kind, ref} for every
+ *                           artifact filed this run (ref = issue URL or GHSA id),
+ *                           so the remediation phase reads a high/critical
+ *                           finding's advisory id deterministically.
  *   --dry-run               Print planned actions; perform reads but no writes.
  *   --help                  Show this help and exit.
  */
@@ -60,6 +64,7 @@ function parseArgs(argv) {
 		issueLabels: [],
 		minConfidence: "low",
 		verbatimTitles: false,
+		emitMap: null,
 		dryRun: false,
 		help: false,
 	};
@@ -71,6 +76,7 @@ function parseArgs(argv) {
 			case "--issue-label": opts.issueLabels.push(argv[++i]); break;
 			case "--min-confidence": opts.minConfidence = argv[++i]; break;
 			case "--verbatim-titles": opts.verbatimTitles = true; break;
+			case "--emit-map": opts.emitMap = argv[++i]; break;
 			case "--dry-run": opts.dryRun = true; break;
 			case "--help": case "-h": opts.help = true; break;
 			default:
@@ -308,7 +314,7 @@ function createIssue(repo, title, body, labels, dryRun) {
 	if (dryRun) {
 		console.log(`  DRY-RUN would create issue: "${title}" [${labels.join(", ")}]`);
 		console.log(indent(body));
-		return;
+		return null;
 	}
 	const bodyFile = tmpWrite("audit-issue", body);
 	try {
@@ -316,6 +322,7 @@ function createIssue(repo, title, body, labels, dryRun) {
 		for (const l of labels) args.push("--label", l);
 		const url = gh(args).trim();
 		console.log(`  filed issue: ${url}`);
+		return url;
 	} finally {
 		fs.rmSync(bodyFile, { force: true });
 	}
@@ -325,7 +332,7 @@ function createAdvisory(repo, summary, body, severity, dryRun) {
 	if (dryRun) {
 		console.log(`  DRY-RUN would create ${severity} advisory: "${summary}"`);
 		console.log(indent(body));
-		return;
+		return null;
 	}
 	const payload = { summary: summary.slice(0, 1024), description: body, severity };
 	const payloadFile = tmpWrite("audit-advisory", JSON.stringify(payload));
@@ -334,6 +341,7 @@ function createAdvisory(repo, summary, body, severity, dryRun) {
 		let ghsa = "(created)";
 		try { ghsa = JSON.parse(out).ghsa_id || ghsa; } catch { /* ignore */ }
 		console.log(`  filed advisory: ${ghsa}`);
+		return ghsa;
 	} finally {
 		fs.rmSync(payloadFile, { force: true });
 	}
@@ -365,6 +373,7 @@ function main() {
 
 	const minRank = CONFIDENCE_RANK[opts.minConfidence];
 	const stats = { issues: 0, advisories: 0, skippedExisting: 0, skippedRejected: 0, skippedConfidence: 0, skippedUnknown: 0, failed: 0 };
+	const filedMap = []; // {fp, kind, ref} for artifacts filed this run, for --emit-map
 
 	for (const f of findings) {
 		if (!f || f.verdict !== "confirmed") { stats.skippedRejected++; continue; }
@@ -389,11 +398,13 @@ function main() {
 				console.log(`public: ${label}`);
 				const title = opts.verbatimTitles ? f.title : neutralTitle(f);
 				const labels = ["ready", "afk", ...opts.issueLabels];
-				createIssue(opts.repo, title, publicIssueBody(f, fp), labels, opts.dryRun);
+				const ref = createIssue(opts.repo, title, publicIssueBody(f, fp), labels, opts.dryRun);
+				filedMap.push({ fp, kind: "issue", ref });
 				if (!opts.dryRun) stats.issues++;
 			} else if (isPrivate) {
 				console.log(`private: ${label}`);
-				createAdvisory(opts.repo, f.title || "Security finding", advisoryBody(f, fp, opts.assignee), sev, opts.dryRun);
+				const ref = createAdvisory(opts.repo, f.title || "Security finding", advisoryBody(f, fp, opts.assignee), sev, opts.dryRun);
+				filedMap.push({ fp, kind: "advisory", ref });
 				if (!opts.dryRun) stats.advisories++;
 			} else {
 				console.error(`skip (unknown severity ${JSON.stringify(sev)}): ${label}`);
@@ -404,6 +415,11 @@ function main() {
 			console.error(`  FAILED: ${firstLine(e)}`);
 			stats.failed++;
 		}
+	}
+
+	if (opts.emitMap) {
+		fs.writeFileSync(opts.emitMap, JSON.stringify(filedMap, null, 2) + "\n");
+		console.log(`\nWrote ${filedMap.length} entr${filedMap.length === 1 ? "y" : "ies"} to ${opts.emitMap}`);
 	}
 
 	console.log("\nSummary:");

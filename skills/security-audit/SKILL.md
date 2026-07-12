@@ -22,7 +22,7 @@ Use the platform's equivalent capabilities while preserving the specified roles,
 
 This skill audits a **git worktree** — a disposable checkout pinned to a single commit — so every run examines a clean, reproducible snapshot without touching your working tree, uncommitted changes, or current branch.
 
-**GitHub is the store.** This skill does not keep a local run history. The persistent record of findings is the set of GitHub issues and advisories the run files (see [Filing findings to a tracker](#filing-findings-to-a-tracker-optional)); everything written to disk during the run is transient and deleted at cleanup. Each run performs a **full scan** of the whole codebase — it does not read a prior run's output to decide what to look at.
+**GitHub is the store.** This skill does not keep a local run history. The persistent record is the set of GitHub artifacts the run produces — merged fix PRs, private advisories, and any fallback issues (see [Remediate, verify, and file](#remediate-verify-and-file)); everything written to disk during the run is transient and deleted at cleanup. Each run performs a **full scan** of the whole codebase — it does not read a prior run's output to decide what to look at.
 
 Before starting, establish the worktree and a scratch directory. Both are ephemeral.
 
@@ -37,19 +37,20 @@ Before starting, establish the worktree and a scratch directory. Both are epheme
 
 - **Target**: the worktree checkout (`.worktrees/security-audit`). Every Phase 1 and Phase 2 agent reads code from here, not from the live working tree.
 - **Scratch directory**: where the transient audit artifacts go. Never write them inside the worktree (they would dirty the checkout) and never commit them anywhere (they carry live vulnerability detail).
+- **Fix worktrees** (Phase 7): each confirmed finding gets its own `.worktrees/security-fix-<fp>` branched from the audited ref, where its fix subagent works. Transient like the rest — merged branches auto-delete, and cleanup removes the worktrees.
 
 Transient files written to the scratch directory during the run:
 - `architecture.md` — Phase 1 output, fed into Phase 2 agent prompts
-- `findings.json` — machine-readable structured output (Phase 5); the input the tracker bridge reads to file issues and advisories
-- `REPORT.md` / `FINDINGS-DETAIL.md` — optional human-readable report (Phase 4). Since the issues and advisories are the durable record, produce these only if you want a one-off summary for the current run; they are deleted at cleanup like everything else.
+- `findings.json` — machine-readable structured output (Phase 5); the input Phase 7 remediation reads to route and fix, and the fallback filer reads for any finding whose fix failed
+- `REPORT.md` / `FINDINGS-DETAIL.md` — optional human-readable report (Phase 4). Since the GitHub artifacts are the durable record, produce these only if you want a one-off summary for the current run; they are deleted at cleanup like everything else.
 
-Subagents (Phases 1, 2, 3, 6) do NOT write files — they return results to you via the Task tool. You are responsible for writing the transient files to the scratch directory.
+Subagents in Phases 1, 2, 3, 6, and 8 do NOT write files — they return results to you via the Task tool. The Phase 7 fix subagents are the exception: each writes its fix into its own fix worktree. You are responsible for writing the transient scratch files.
 
 ### Coverage
 
 Each audit run explores different code paths depending on which agents find what and where they dig. No single run finds everything. Testing shows the best single run finds roughly half the total vulnerabilities across multiple runs, so running periodically (e.g. weekly) and on a fresh checkout each time is expected.
 
-Because GitHub is the store, the only prior state consulted is at **filing time**: the tracker bridge skips any finding already tracked by an open issue (or an existing advisory), so repeated runs do not create duplicate issues. It does not reopen closed issues or auto-close fixed ones — on a small repo, triage those by hand. The hunt itself always runs full; it does not try to skip ground a previous run covered.
+Because GitHub is the store, the only prior state consulted is at **delivery time**: a finding whose fix is already open or merged as a PR, or already tracked by an open issue or existing advisory, is skipped, so repeated runs do not re-fix or duplicate. Dedup skips only *delivered* fixes, never live bugs — a vulnerability a fix failed to close reappears in the next full scan. It does not reopen closed issues or auto-close fixed ones — on a small repo, triage those by hand. The hunt itself always runs full; it does not try to skip ground a previous run covered.
 
 ## Core Principles
 
@@ -89,7 +90,7 @@ These principles are enforced operationally by the **validation rules in [HUNTIN
 
 ## Workflow overview
 
-Follow all six phases in order:
+Follow all eight phases in order:
 
 1. **Recon** — Run Phase 1 from [RECONNAISSANCE.md](RECONNAISSANCE.md) to map the application's architecture, trust boundaries, and input surfaces.
 2. **Hunt** — Use [HUNTING.md](HUNTING.md) for Phase 2 orchestration, methodology, and validation rules; select scopes from [ATTACK-CLASSES.md](ATTACK-CLASSES.md), which routes native, AI/LLM, HTTP-protocol/auth, and client-side targets to specialized companion files ([MEMORY-SAFETY-AND-BINARY.md](MEMORY-SAFETY-AND-BINARY.md), [AI-AND-LLM.md](AI-AND-LLM.md), [WEB-PROTOCOL-AND-AUTH.md](WEB-PROTOCOL-AND-AUTH.md), [CLIENT-SIDE.md](CLIENT-SIDE.md)).
@@ -97,38 +98,44 @@ Follow all six phases in order:
 4. **Report** — Use Phase 4 in [VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md) to write `REPORT.md` and `FINDINGS-DETAIL.md`.
 5. **Structured output** — Use Phase 5 in [VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md), `report-schema.json`, and `validate-findings.cjs` to write and validate `findings.json`.
 6. **Independent verification** — Use Phase 6 in [VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md) to verify every factual claim and reconcile all outputs.
+7. **Remediate** — Use Phase 7 in [REMEDIATION.md](REMEDIATION.md) to dispatch one fix subagent per confirmed finding on its own branch, routing delivery by the disclosure split.
+8. **Verify** — Use Phase 8 in [REMEDIATION.md](REMEDIATION.md) to re-run each finding's exploit against the patched code with an independent verifier, so only proven fixes merge.
 
-## Filing findings to a tracker (optional)
+## Remediate, verify, and file
 
-`findings.json` (in the scratch directory) is turned into tracker items for an autonomous fix queue with `file-findings.cjs` (in this skill's directory), **before cleanup deletes the scratch directory**. It routes each confirmed finding by `overall_severity`:
+Phases 7 and 8 ([REMEDIATION.md](REMEDIATION.md)) fix each confirmed finding on its own branch and prove the fix before it merges. `findings.json` (in the scratch directory) is the input; `file-findings.cjs` (in this skill's directory) is now the **fallback** filer and the advisory vehicle, run **before cleanup deletes the scratch directory**.
 
-- **informational / low / medium** → a **public issue** labelled `ready` + `afk`, so an autonomous worker (e.g. the `start-next-issue` flow) can pick it up. The issue body is deliberately neutral — intended behavior, fix strategy, and affected file names only. It carries **no** description, trace lines, preconditions, exploitation steps, payloads, or severity words.
-- **high / critical** → a **private GitHub Security Advisory** with the complete finding. **No public issue is filed.**
+Route every confirmed finding by `overall_severity` — this split is the whole safety mechanism:
 
-Why the split: on a public repo the fix diff itself discloses the vulnerability, so a HIGH/CRITICAL must go through coordinated disclosure (advisory + fix published together), never a public issue that broadcasts an unpatched hole. LOW/MEDIUM disclosure is the accepted tradeoff of tracking the work at all. The severity gate is the whole safety mechanism — do not widen the public bucket for a public repo.
+- **informational / low / medium** → a **public fix PR**. The agent fixes the finding on a branch, an independent verifier proves the vulnerability is gone (Phase 8), and the PR auto-merges through the CI `test` gate. The PR body is deliberately neutral — intended behavior only, no description, trace, preconditions, exploitation steps, payloads, or severity words. If the fix fails or cannot be verified, it falls back to a **public issue** (labelled `ready` + `afk`) with that same neutral body, so an autonomous worker (e.g. the `start-next-issue` flow) can pick it up.
+- **high / critical** → a **private GitHub Security Advisory** with the complete finding, and the fix developed in the advisory's **temporary private fork** as a private PR for a human to review, publish, and merge. **No public issue and no public PR is ever filed.**
 
-The tool is **idempotent** and this is what makes GitHub the store: each artifact embeds a fingerprint marker derived from the trace's file+function locations (line-independent, so it survives code drift) plus the title. Before filing, it reads the repo's **open** issues and existing advisories and skips any finding already tracked there, so a weekly re-scan does not create duplicates. It does not reopen closed issues or close fixed ones — triage the open queue by hand on a small repo.
+Why the split: on a public repo the fix diff itself discloses the vulnerability, so a HIGH/CRITICAL must go through coordinated disclosure (advisory + fix published together), never a public artifact that broadcasts an unpatched hole. LOW/MEDIUM disclosure is the accepted tradeoff of fixing the bug in the open. The severity gate is the whole safety mechanism — do not widen the public path for a public repo.
+
+`file-findings.cjs` is **idempotent** and this is what makes GitHub the store: each artifact embeds a fingerprint marker (`AUDIT-FINDING:<fp>`) derived from the trace's file+function locations (line-independent, so it survives code drift) plus the title. Phase 7 skips any finding whose fix PR is already open or merged; the filer skips any finding already tracked by an open issue or existing advisory. So a weekly re-scan neither re-fixes nor duplicates. Neither reopens closed items nor closes fixed ones — triage the open queue by hand on a small repo.
+
+For the fallback subset (findings whose fix failed) and the high/critical advisories, invoke the filer directly. ALWAYS dry-run first and read the public bodies it prints — confirm no exploit detail leaked through free-text fields:
 
 ```
-# ALWAYS dry-run first and read the public issue bodies it prints — confirm no exploit detail leaked through free-text fields
 node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human> --dry-run
 
-# then file for real
-node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human>
+# then file for real, capturing the GHSA ids Phase 7 needs to build private forks
+node <skill-dir>/file-findings.cjs <scratch-dir>/findings.json --repo <owner/name> --assignee <human> --emit-map <scratch-dir>/filed.json
 ```
 
-Requires the `gh` CLI authenticated with repo access; filing advisories needs the security-advisories API enabled (default on public repos). The target repo must already have the `ready` and `afk` labels (see the `bootstrap-issues` flow). Run `--help` for all options (`--issue-label`, `--min-confidence`, `--verbatim-titles`).
+`--emit-map` writes a JSON array of `{fp, kind, ref}` for every artifact filed, so Phase 7 reads a high/critical finding's GHSA id deterministically instead of scraping stdout. Requires the `gh` CLI authenticated with repo access; filing advisories needs the security-advisories API enabled (default on public repos). The target repo must be bootstrapped for the queue — `ready`/`afk` labels, the CI `test` gate, branch protection, and auto-merge (see the `bootstrap-issues` flow). Run `--help` for all options (`--issue-label`, `--min-confidence`, `--verbatim-titles`).
 
 ## Cleanup
 
-Once the findings have been filed to the tracker, tear down everything transient — GitHub now holds the durable record:
+Once the fixes are delivered, verified, and any fallback subset filed, tear down everything transient — GitHub now holds the durable record (merged fix PRs, advisories, fallback issues):
 
 ```
 git worktree remove .worktrees/security-audit
+git worktree remove .worktrees/security-fix-*   # every per-finding fix worktree
 rm -rf <scratch-dir>
 ```
 
-Nothing persists locally. To re-examine, run the audit again against the same ref.
+Merged low/medium fix branches auto-delete (delete-branch-on-merge); the unmerged private-fork PRs are intentionally left for a human to publish. Nothing else persists locally. To re-examine, run the audit again against the same ref.
 
 ## Anti-Patterns to Avoid
 
