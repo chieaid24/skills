@@ -8,13 +8,13 @@ keep yourself in the loop.
 
 ## Quickstart
 
-Install the skills onto Codex and Claude Code:
+Run the installer and add every skill to Codex and Claude Code:
 
 ```bash
-npx skills add chieaid24/skills --skill '*' --global --agent codex --agent claude-code --yes
+npx skills@latest add chieaid24/skills
 ```
 
-Repeat `--skill` to install specific ones instead of `'*'`; `npx skills add chieaid24/skills --list` shows what is available. Then, in a repo you want to work in:
+Then, in a repo you want to work in:
 
 - `/bootstrap-issues` sets up the queue.
 - `/spec` shapes an idea into a PRD with child issues, or straight into one or a few issues for a small change.
