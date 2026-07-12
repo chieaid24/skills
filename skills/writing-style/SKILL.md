@@ -17,6 +17,8 @@ That reader has none of your context. They do not know the ticket number, the in
 
 The **internal technical record** - commit messages, code comments - is written for someone inside the work, reading with the diff open. It follows the repo's own convention, and this skill stays out of it.
 
+**Agent-facing instructions** are not published prose either. A `SKILL.md`, an `AGENTS.md`, or a `CLAUDE.md` is read by a machine executing it, not by a stranger deciding whether to care. Those are governed by `writing-great-skills`, whose structure and voice rules deliberately differ from these. This skill stays out of them too - and its voice overlay especially so, since a personal register has no business in instructions an agent must follow.
+
 ## The reader's next action
 
 One test governs inclusion: does this line change what the reader does next? A line that survives is load-bearing. A line that merely proves you did the work is **filler**, and filler is the tax every reader pays on every read.
