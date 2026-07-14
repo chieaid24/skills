@@ -21,6 +21,10 @@ Then, in a repo you want to work in:
 - `/start-next-issue` works the queue.
 - `/catch-up` reviews what happened.
 
+To work several repos in one run, invoke `/start-next-issue` from the folder that holds them (say
+`~/projects`) with a `.start-next-issue-repos` file listing the clones, one per line. It then picks
+each issue from whichever repo has the most-blocking one.
+
 ## Skills
 
 All ten are model-invoked: the agent can reach for one on its own when the task fits, or you can type it.
@@ -30,7 +34,7 @@ All ten are model-invoked: the agent can reach for one on its own when the task 
 - [**bootstrap-issues**](skills/bootstrap-issues) - One-shot repo setup for the queue: CI test gate, work-queue labels, self-merge branch protection, issue template, pre-commit hooks, and a grilled `DESIGN.md` for frontend repos.
 - [**setup-pre-commit**](skills/setup-pre-commit) - Stack-aware pre-commit hook that runs format, lint, and test before every commit.
 - [**spec**](skills/spec) - Grills a rough idea into sharpened terms and ADRs, then publishes either a `[PRD]` with child slices or a few dependency-linked issues.
-- [**start-next-issue**](skills/start-next-issue) - Claims the most-blocking ready issue, drives it to a merged PR, and chains up to three of them, halting on any failure. Never touches `hitl`.
+- [**start-next-issue**](skills/start-next-issue) - Claims the most-blocking ready issue, drives it to a merged PR, and chains up to three of them, halting on any failure. Runs against one repo, or against every repo in a list when you invoke it from the folder above them. Never touches `hitl`.
 - [**catch-up**](skills/catch-up) - Read-only morning report of what shipped, what stalled, and which `hitl` issues are waiting on you.
 
 ### Autonomous audit passes
