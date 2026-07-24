@@ -1,6 +1,6 @@
 ---
 name: start-next-issue
-description: Iteration-capped orchestrator for the dependency-aware GitHub queue -- the main agent grabs the next ready `afk` issue (skipping `hitl` issues, which need a human), drives it to a merged PR, then dispatches a fresh-context worker agent per remaining iteration (up to 3 issues total), each reporting back to the orchestrator before the next starts; any failure propagates upward and stops the run. Runs inside a git repo against that repo's queue, or from a parent folder (e.g. ~/projects) against several repos at once, listed in a `.start-next-issue-repos` file. Optionally accepts an issue number (/start-next-issue 42) or plain-text description (/start-next-issue "fix auth bug") to target a specific issue on the first iteration. Use when the user wants an agent to work a bounded batch of issues from the queue, "work the next few issues", run a capped orchestrated batch, or invokes /start-next-issue.
+description: Iteration-capped orchestrator for the dependency-aware GitHub queue -- the main agent grabs the next ready `afk` issue (skipping `hitl` issues, which need a human), drives it to a merged PR, then dispatches a fresh-context worker agent per remaining iteration (up to 3 issues total), each reporting back to the orchestrator before the next starts; any failure propagates upward and stops the run. Runs inside a git repo against that repo's queue, or from a parent folder (e.g. ~/projects) against several repos at once, listed in a `.agent-repos` file. Optionally accepts an issue number (/start-next-issue 42) or plain-text description (/start-next-issue "fix auth bug") to target a specific issue on the first iteration. Use when the user wants an agent to work a bounded batch of issues from the queue, "work the next few issues", run a capped orchestrated batch, or invokes /start-next-issue.
 ---
 
 # Start Next Issue
@@ -17,12 +17,12 @@ Before minting a chain id or reading any queue, decide which queues you are serv
 git rev-parse --show-toplevel 2>/dev/null
 ```
 
-- **Succeeds -> single-repo mode.** The cwd's repo is the only queue. Any `.start-next-issue-repos` file is ignored. `<repo>` below is always that one repo, and the repo-scoped command forms collapse to the plain ones.
-- **Fails (not a git repo) -> multi-repo mode.** The cwd is a parent folder holding several clones (e.g. `~/projects`). Read `.start-next-issue-repos` from the cwd for the repos to serve.
+- **Succeeds -> single-repo mode.** The cwd's repo is the only queue. Any `.agent-repos` file is ignored. `<repo>` below is always that one repo, and the repo-scoped command forms collapse to the plain ones.
+- **Fails (not a git repo) -> multi-repo mode.** The cwd is a parent folder holding several clones (e.g. `~/projects`). Read `.agent-repos` from the cwd for the repos to serve.
 
 ### The repo list (multi-repo mode)
 
-`./.start-next-issue-repos`, one local clone per line. Blank lines and `#` comments ignored. Line order is the tiebreak order used in step 2.
+`./.agent-repos`, one local clone per line. Blank lines and `#` comments ignored. Line order is the tiebreak order used in step 2.
 
 ```
 # repos this queue runner serves; paths relative to this file, or absolute

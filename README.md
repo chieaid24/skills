@@ -22,7 +22,7 @@ Then, in a repo you want to work in:
 - `/catch-up` reviews what happened.
 
 To work several repos in one run, invoke `/start-next-issue` from the folder that holds them (say
-`~/projects`) with a `.start-next-issue-repos` file listing the clones, one per line. It then picks
+`~/projects`) with a `.agent-repos` file listing the clones, one per line. It then picks
 each issue from whichever repo has the most-blocking one.
 
 ## Skills
