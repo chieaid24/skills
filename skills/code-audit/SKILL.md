@@ -1,6 +1,6 @@
 ---
 name: code-audit
-description: Autonomous architecture-improvement pass. Explore the codebase for deepening opportunities (shallow modules to deep modules), delegate behavior-preserving refactors to subagents, and continuously verify that nothing changed from the consumer side by keeping unit, integration, and E2E suites green. Use for unattended architecture cleanup, "audit the code", "improve the architecture", agent-driven refactoring runs, or /code-audit.
+description: Autonomous architecture-improvement pass. Explore the codebase for deepening opportunities (shallow modules to deep modules), delegate behavior-preserving refactors to subagents, and continuously verify that nothing changed from the consumer side by keeping unit, integration, and E2E suites green. Use for unattended architecture cleanup, "audit the code", "improve the architecture", agent-driven refactoring runs, or /code-audit. Not for adding features, fixing bugs, or any change that alters observable behavior.
 ---
 
 # Code Audit

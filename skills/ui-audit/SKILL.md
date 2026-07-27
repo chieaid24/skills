@@ -1,6 +1,6 @@
 ---
 name: ui-audit
-description: Audit and repair the visual consistency of a UI, unattended. Screenshot every flow with the repo's browser runner, find defects (misalignment, overlap, clipped text, overflow) and drift from DESIGN.md or from the app's own dominant patterns, then dispatch a fix subagent per finding and re-run its probe until every flow is clean. Use when the user wants to audit the UI, fix UI inconsistencies, or screenshot every flow and check it.
+description: Audit and repair the visual consistency of a UI, unattended. Screenshot every flow with the repo's browser runner, find defects (misalignment, overlap, clipped text, overflow) and drift from DESIGN.md or from the app's own dominant patterns, then dispatch a fix subagent per finding and re-run its probe until every flow is clean. Use when the user wants to audit the UI, fix UI inconsistencies, or screenshot every flow and check it. Not for building new screens, redesigns, or UX/copy changes - only visual-consistency repair of existing flows.
 ---
 
 # UI Audit

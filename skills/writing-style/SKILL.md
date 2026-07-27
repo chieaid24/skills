@@ -1,6 +1,6 @@
 ---
 name: writing-style
-description: "House writing style for published prose - anything a reader outside the work will see. Use when writing or editing a README, a blog post, release notes, an announcement, a docs page, landing or marketing copy, a changelog entry, or a PR body."
+description: "House writing style for published prose - anything a reader outside the work will see. Use when writing or editing a README, a blog post, release notes, an announcement, a docs page, landing or marketing copy, a changelog entry, or a PR body. Not for commit messages, code comments, or agent instructions (SKILL.md / AGENTS.md) - those follow the repo convention or writing-great-skills."
 ---
 
 # Writing Style
