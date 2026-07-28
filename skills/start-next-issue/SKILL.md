@@ -54,17 +54,22 @@ Everything below is written for both modes at once, on one convention: **an issu
 | `/start-next-issue "fix auth bug"` | New run, fuzzy-matched to issue title (across every served repo) for iteration `1/3` only -- skip to step 2a |
 | `/start-next-issue --worker <n>/3 --chain <id>` | **Internal**, set by the orchestrator's dispatch (step 6). Work exactly one issue, end with a `RESULT:` line, dispatch nothing. Not user-typed. |
 | `/start-next-issue --iteration <n>/3 --chain <id>` | Human resume of a dead run: adopt the chain's paused lane (step 0), finish it as iteration `<n>/3`, then orchestrate the remaining iterations. |
-| `/start-next-issue --reclaim ledger#42` | Human-only. Force-release the claim on that issue (a run died and its chain id is lost), then stop. |
+| `/start-next-issue --reclaim ledger#42` | Human-only. Adopt a dead lane (its chain id is lost): break the claim, re-claim under your own chain, pick up its worktree/branch, drive it to a merged PR, then stop -- one issue, no iterations. |
 
 Any invocation without `--worker`/`--iteration` starts a **fresh 3-iteration budget** at `1/3`, with this agent as the orchestrator for the whole run. The budget is **3 issues total, drawn from any served repo** -- multi-repo mode widens where work comes from, it does not multiply the run. A pin applies to iteration `1/3` only -- dispatched workers always use normal selection.
 
-`--reclaim` is the sole way to break another chain's claim, and it is **never** something an agent decides for itself. In multi-repo mode it **must** name the repo (`--reclaim ledger#42`); a bare number is ambiguous, so resolve it as step 2a does and ask if it hits more than one repo. Show the claim's `chain`, `host`, and `claimed_at`, confirm with the human that the lane is truly dead, then release and re-open the issue for the queue -- both commands scoped to the owning repo:
+`--reclaim` is the sole way to break another chain's claim, and it is **never** something an agent decides for itself. Unlike a normal run it does not orchestrate: it **adopts one dead lane and finishes it** -- break the claim, re-claim under your own chain, pick up the dead worktree/branch where it stopped, drive it to a merged PR, then stop. One issue, no iterations.
 
-```bash
-git -C <repo> push -q origin :refs/claims/issue-42
-gh -R <owner>/<repo> issue edit 42 --remove-assignee @me --remove-label in-progress --add-label ready
-```
-Leave the stale worktree and branch for the human. Then stop -- do not go on to grab work.
+In multi-repo mode it **must** name the repo (`--reclaim ledger#42`); a bare number is ambiguous, so resolve it as step 2a does and ask if it hits more than one repo.
+
+1. **Confirm the lane is dead.** Show the claim's `chain`, `host`, and `claimed_at` and have the human confirm. Liveness is not observable here (step 0), so reclaiming a *live* lane hijacks a working sibling and corrupts both -- this confirmation is the only guard against that. Proceed only on a yes.
+2. **Break the dead claim, then re-claim under your own chain.** Release the stale ref, then run **step 3** atomically under your `chain_id` so the lane is owned again. If that re-claim loses the CAS, another agent claimed it in the gap -- stop and report, do not fight for it. Holding the ref makes the reclaim itself crash-recoverable: your own step 0 re-adopts it.
+   ```bash
+   git -C <repo> push -q origin :refs/claims/issue-42   # break the dead claim
+   # then step 3's atomic claim, under your chain_id -- re-adds assignee + in-progress
+   ```
+3. **Pick up where it died.** Find the dead lane's branch and worktree by issue number -- `git -C <repo> worktree list` and `git -C <repo> branch --list '42-*'`. If the worktree survived, reuse it (its uncommitted edits are still there); if only the branch remains, re-attach per step 4 (`git -C <repo> worktree add .worktrees/<branch> <branch>`). Read what it left -- `git log` and `git diff origin/<default-branch>`, plus `gh -R <owner>/<repo> pr list --head <branch>` for an already-open PR -- to see how far it got, then continue **steps 4-5** from there to a merged PR (reuse the open PR if one exists).
+4. **Then stop.** The issue is done. Do **not** fall through to step 5a and do **not** start iterations -- report the merged PR and end.
 
 ## Chain identity -- who "you" are
 
@@ -193,7 +198,7 @@ The claim ref is the **durable, cross-host claim** and the sole ownership record
 - **Same repo, same issue, many agents -> still exactly one winner**, whether they run in one clone, separate clones, separate hosts, or from different multi-repo roots with different repo lists. None of that is visible to the CAS: the server compares the ref, and the loser's push is rejected. Widening the candidate pool changes which issues get raced for, not who wins a race.
 - **The `-C`/`-R` flags are the load-bearing part**: they carry the repo half of the claim's identity. A bare `git push` here trusts the cwd, and in multi-repo mode the cwd is not a repo at all.
 
-**Stale claim refs** (crashed agent whose chain id is lost) are reaped only by a human, via `--reclaim`. No agent may decide on its own that another chain's claim has gone stale.
+**Stale claim refs** (crashed agent whose chain id is lost) are reaped -- and the lane finished -- only by a human, via `--reclaim`. No agent may decide on its own that another chain's claim has gone stale.
 
 ### 4. Work it -- in a dedicated worktree
 One issue -> one worktree -> one branch, **inside the issue's own repo**. Cut the branch from that repo's **fresh** `<default-branch>` (does not touch its shared checkout):
@@ -281,7 +286,7 @@ One grammar in both modes: `issue=` is always addressed (`acme/ledger#42`). `dra
 - `merged` -> record it, then loop: dispatch `<n+2>/3` or stop after `3/3`.
 - `halted` -> **stop the run now.** Surface the worker's reason, the issue number, and the claim state to the user. Never dispatch past a failure.
 - `drained` / `hitl-only` -> stop and report (list the waiting `hitl` issues if the worker named them).
-- **Anything else** -- no `RESULT:` line, a spawn error, a worker that died mid-issue -- treat it as `halted`: stop, report your `chain_id` and what you observed, and point the human at `--iteration <n>/3 --chain <chain_id>` (resume) or `--reclaim` (break the claim). Never re-dispatch the same iteration -- the dead worker may hold a half-finished claim -- and never dispatch the next one on an ambiguous result.
+- **Anything else** -- no `RESULT:` line, a spawn error, a worker that died mid-issue -- treat it as `halted`: stop, report your `chain_id` and what you observed, and point the human at `--iteration <n>/3 --chain <chain_id>` (resume with the chain id) or `--reclaim` (chain id lost -- adopt and finish the dead lane). Never re-dispatch the same iteration -- the dead worker may hold a half-finished claim -- and never dispatch the next one on an ambiguous result.
 
 ## Stopping
 
