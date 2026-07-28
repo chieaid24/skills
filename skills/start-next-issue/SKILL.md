@@ -58,18 +58,16 @@ Everything below is written for both modes at once, on one convention: **an issu
 
 Any invocation without `--worker`/`--iteration` starts a **fresh 3-iteration budget** at `1/3`, with this agent as the orchestrator for the whole run. The budget is **3 issues total, drawn from any served repo** -- multi-repo mode widens where work comes from, it does not multiply the run. A pin applies to iteration `1/3` only -- dispatched workers always use normal selection.
 
-`--reclaim` is the sole way to break another chain's claim, and it is **never** something an agent decides for itself. Unlike a normal run it does not orchestrate: it **adopts one dead lane and finishes it** -- break the claim, re-claim under your own chain, pick up the dead worktree/branch where it stopped, drive it to a merged PR, then stop. One issue, no iterations.
+`--reclaim` is the sole way to break another chain's claim, and it is **never** something an agent decides for itself. Unlike a normal run it does not orchestrate -- it **adopts one dead lane and finishes it**, then stops. In multi-repo mode it **must** name the repo (`--reclaim ledger#42`); a bare number is ambiguous, so resolve it as step 2a does and ask if it hits more than one repo.
 
-In multi-repo mode it **must** name the repo (`--reclaim ledger#42`); a bare number is ambiguous, so resolve it as step 2a does and ask if it hits more than one repo.
-
-1. **Confirm the lane is dead.** Show the claim's `chain`, `host`, and `claimed_at` and have the human confirm. Liveness is not observable here (step 0), so reclaiming a *live* lane hijacks a working sibling and corrupts both -- this confirmation is the only guard against that. Proceed only on a yes.
-2. **Break the dead claim, then re-claim under your own chain.** Release the stale ref, then run **step 3** atomically under your `chain_id` so the lane is owned again. If that re-claim loses the CAS, another agent claimed it in the gap -- stop and report, do not fight for it. Holding the ref makes the reclaim itself crash-recoverable: your own step 0 re-adopts it.
+1. **Confirm the lane is dead.** Show the claim's `chain`, `host`, and `claimed_at` and have the human confirm. Liveness is not observable here (step 0), so reclaiming a *live* lane hijacks a working sibling -- the confirmation is the only guard. Proceed only on a yes.
+2. **Break the dead claim, then re-claim under your own chain.** Release the stale ref, then run **step 3** atomically under your `chain_id` so the lane is owned again. If the re-claim loses the CAS, another agent got there first -- stop and report. Owning the ref makes the reclaim itself crash-recoverable: your own step 0 re-adopts it.
    ```bash
    git -C <repo> push -q origin :refs/claims/issue-42   # break the dead claim
    # then step 3's atomic claim, under your chain_id -- re-adds assignee + in-progress
    ```
-3. **Pick up where it died.** Find the dead lane's branch and worktree by issue number -- `git -C <repo> worktree list` and `git -C <repo> branch --list '42-*'`. If the worktree survived, reuse it (its uncommitted edits are still there); if only the branch remains, re-attach per step 4 (`git -C <repo> worktree add .worktrees/<branch> <branch>`). Read what it left -- `git log` and `git diff origin/<default-branch>`, plus `gh -R <owner>/<repo> pr list --head <branch>` for an already-open PR -- to see how far it got, then continue **steps 4-5** from there to a merged PR (reuse the open PR if one exists).
-4. **Then stop.** The issue is done. Do **not** fall through to step 5a and do **not** start iterations -- report the merged PR and end.
+3. **Pick up where it died.** Find the dead branch and worktree by issue number -- `git -C <repo> worktree list` and `git -C <repo> branch --list '42-*'`. Reuse the worktree if it survived (its uncommitted edits are still there); otherwise re-attach the branch per **step 4**. Read what it left -- `git log`, `git diff origin/<default-branch>`, and `gh -R <owner>/<repo> pr list --head <branch>` for an open PR -- then continue **steps 4-5** to a merged PR, reusing that PR if it exists.
+4. **Then stop.** One issue -- report the merged PR and end. A reclaim run never continues to step 5a or another iteration.
 
 ## Chain identity -- who "you" are
 
