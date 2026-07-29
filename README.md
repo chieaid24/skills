@@ -27,7 +27,7 @@ each issue from whichever repo has the most-blocking one.
 
 ## Skills
 
-All ten are model-invoked: the agent can reach for one on its own when the task fits, or you can type it.
+All eleven are model-invoked: the agent can reach for one on its own when the task fits, or you can type it.
 
 ### The issue-queue workflow
 
@@ -42,6 +42,10 @@ All ten are model-invoked: the agent can reach for one on its own when the task 
 - [**code-audit**](skills/code-audit) - Deepens shallow modules through subagents, reverting any change the unit, integration, and E2E suites cannot prove behaviour-preserving.
 - [**ui-audit**](skills/ui-audit) - Screenshots every flow, measures visual defects and design-system drift, and fixes each with a committed probe that was red before and green after.
 - [**security-audit**](skills/security-audit) - Multi-agent hunt for exploitable vulnerabilities: recon, attack-class hunting, adversarial validation, and a schema-checked report.
+
+### Driving the browser
+
+- [**drive-browser**](skills/drive-browser) - Drives your already-signed-in Chrome through the chrome-devtools MCP tools so an agent finishes login-gated web steps on its own: starts or reseeds the debug browser, never types passwords, and gates irreversible actions.
 
 ### Writing and meta
 
