@@ -60,7 +60,7 @@ Any invocation without `--worker`/`--iteration` starts a **fresh 3-iteration bud
 
 `--reclaim` is the sole way to break another chain's claim, and it is **never** something an agent decides for itself. Unlike a normal run it does not orchestrate -- it **adopts one dead lane and finishes it**, then stops. In multi-repo mode it **must** name the repo (`--reclaim ledger#42`); a bare number is ambiguous, so resolve it as step 2a does and ask if it hits more than one repo.
 
-1. **Confirm the lane is dead.** Show the claim's `chain`, `host`, and `claimed_at` and have the human confirm. Liveness is not observable here (step 0), so reclaiming a *live* lane hijacks a working sibling -- the confirmation is the only guard. Proceed only on a yes.
+1. **Record the claim you are breaking, then go.** Print the claim's `chain`, `host`, and `claimed_at` so the reclaim is auditable -- then proceed straight to step 2. Do **not** pause, confirm, or ask "are you sure": typing `--reclaim` is itself the human's deliberate decision to break the claim, and the human owns the risk that liveness is not observable here (step 0) so a *live* lane could be hijacked.
 2. **Break the dead claim, then re-claim under your own chain.** Release the stale ref, then run **step 3** atomically under your `chain_id` so the lane is owned again. If the re-claim loses the CAS, another agent got there first -- stop and report. Owning the ref makes the reclaim itself crash-recoverable: your own step 0 re-adopts it.
    ```bash
    git -C <repo> push -q origin :refs/claims/issue-42   # break the dead claim
