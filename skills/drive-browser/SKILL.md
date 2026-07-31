@@ -1,6 +1,6 @@
 ---
 name: drive-browser
-description: Drive the user's logged-in Chrome through the chrome-devtools MCP tools to finish login-gated web steps without handing control back. Use when a task needs an authenticated web action or data from a signed-in site, when the browser tools return a connection error, or when a page loads logged-out.
+description: Drive the user's logged-in Chrome through the chrome-devtools MCP tools to complete authenticated web steps. Use when a task needs a signed-in site, the browser cannot connect, or a page loads signed-out; hand authentication and human-judgment gates back to the user.
 ---
 
 # Drive browser
@@ -17,15 +17,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\chrome
 
 Before retrying, confirm the port answers: `curl -s http://127.0.0.1:9222/json/version` returns JSON. If it still refuses, the WSL-to-Windows loopback is off: tell the user to run `wsl --shutdown` from Windows and reopen WSL once, then start the browser again.
 
-## Never type passwords
+## Hand off human gates
 
-The debug profile carries the user's sessions, so navigate straight to authenticated pages. If a page loads signed-out, the session expired. Do not fill in the login form and do not ask the user for a password. Reseed the profile from their live logins instead:
+The user completes passwords, passkeys, MFA, CAPTCHAs, account creation, authorization grants, and decisions that require their judgment.
+
+If a page loads signed-out, reseed the profile once from their live session:
 
 ```
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\chrome-debug.ps1" -Reseed
 ```
 
-If reseed still shows signed-out (the site demands fresh 2FA), ask the user to sign in once in the debug profile: they run the launcher with `-Headful`, sign in, and the session then persists.
+If the site remains signed-out, stop the browser flow. Tell the user which site is blocked, what recovery failed, and the smallest next action. For login, ask them to run the launcher with `-Headful` and sign in. Resume only after they confirm.
+
+Keep recovery on the intended path. Do not search other profiles, alter browser processes, or substitute another interface to evade a human gate. Any broader workaround requires explicit user direction.
 
 ## Gate irreversible actions
 
