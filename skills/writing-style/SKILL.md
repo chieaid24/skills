@@ -7,17 +7,13 @@ description: "House writing style for READMEs. Use only when writing or editing 
 
 Terse, imperative, engineer-facing prose, after the Google developer documentation style. Second person, present tense, active voice.
 
-The rules below fight the defaults a language model brings to prose. They are the whole guide; per-artifact structure lives behind the pointers in [Artifacts](#artifacts).
+The rules below guide README prose. README structure lives in [references/readmes.md](references/readmes.md).
 
-## Scope: the reader is a stranger
+## Scope: README files only
 
-This skill governs **published prose** - anything read by someone outside the work: a README, a post, release notes, an announcement, a docs page, landing copy, a PR body. The test is whether a reader who was not in the room will see it.
+Invoke this skill only when writing or editing a README file. In tasks that change several file types, apply these rules only to the README. Other prose follows the repo's own convention; agent instructions follow `writing-great-skills`.
 
-That reader has none of your context. They do not know the ticket number, the internal codename, the teammate you argued with, or the acronym your team coined last month. Published prose carries its own context or it fails.
-
-The **internal technical record** - commit messages, code comments - is written for someone inside the work, reading with the diff open. It follows the repo's own convention, and this skill stays out of it.
-
-**Agent-facing instructions** are not published prose either. A `SKILL.md`, an `AGENTS.md`, or a `CLAUDE.md` is read by a machine executing it, not by a stranger deciding whether to care. Those are governed by `writing-great-skills`, whose structure and voice rules deliberately differ from these. This skill stays out of them too - and its voice overlay especially so, since a personal register has no business in instructions an agent must follow.
+A README reader has none of your context. They do not know the ticket number, the internal codename, the teammate you argued with, or the acronym your team coined last month. A README carries its own context or it fails.
 
 ## The reader's next action
 
@@ -31,7 +27,7 @@ A reader who stops after sentence one should still have the answer.
 
 ## Cut the throat-clearing
 
-**Throat-clearing** is the run-up before the point: `This PR aims to...`, `In this section we will explore...`, `It is worth noting that...`, `As you can see...`. Open on the substance instead.
+**Throat-clearing** is the run-up before the point: `In this section we will explore...`, `It is worth noting that...`, `As you can see...`. Open on the substance instead.
 
 The same applies at the end. Once the point is made, stop. A closing paragraph that restates the body is **restatement**, and it earns nothing.
 
@@ -73,12 +69,6 @@ The overlay never overrides structure. A README keeps its shape no matter whose 
 
 If no overlay exists, the default voice is the one described at the top of this file.
 
-## Artifacts
+## README structure
 
-Each artifact adds structure on top of the rules above. Read the one you are about to write:
-
-- [READMEs](references/readmes.md) - and docs pages, which share its shape
-- [Posts](references/posts.md) - blog posts, announcements, release notes, changelogs, landing copy
-- [PR bodies](references/pr-bodies.md)
-
-An artifact with no reference file of its own still takes the rules above, and borrows the shape of whichever of the three it most resembles.
+Read [references/readmes.md](references/readmes.md) when writing or editing a README.
